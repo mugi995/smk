@@ -40,6 +40,11 @@ void user_init(void)
     GPIO_DIR_WRITE(2, 0x3F);
     GPIO_DIR_WRITE(3, 0x3F);
 
+    // Match the stock firmware's P0 state: P0.2/P0.3/P0.4 high, P0.7 low.
+    // These may be LED driver / boost enables.
+    P0   = 0x7C; // P0.2,3,4,5,6 high (keep encoder latches high)
+    P0CR = 0x9C; // P0.2,3,4,7 outputs; P0.5/6 stay inputs
+
     // Encoder A/B (P0.5/P0.6): inputs with pull-ups.
     GPIO_HIGH(0, _P0_5 | _P0_6);
     GPIO_INPUT(0, _P0_5 | _P0_6);
