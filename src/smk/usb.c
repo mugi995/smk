@@ -191,6 +191,7 @@ const uint8_t hid_report_desc_extra[] = {
     HID_RI_USAGE_PAGE(16, 0xff60),
     HID_RI_USAGE(8, 0x61),
     HID_RI_COLLECTION(8, 0x01),
+        HID_RI_REPORT_ID(8, REPORT_ID_RAW_HID),
         HID_RI_USAGE(8, 0x62),
         HID_RI_LOGICAL_MINIMUM(8, 0x00),
         HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
@@ -297,7 +298,7 @@ usb_desc_endpoint_c usb_desc_endpoint_raw_out = {
     .bDescriptorType  = USB_DESC_ENDPOINT,
     .bEndpointAddress = 2 | USB_DIR_OUT,
     .bmAttributes     = USB_XFER_INTERRUPT,
-    .wMaxPacketSize   = 32,
+    .wMaxPacketSize   = 64,
     .bInterval        = 1,
 };
 #endif
@@ -474,10 +475,16 @@ void usb_send_extra(__xdata report_extra_t *report)
 }
 
 #ifdef VIAL_ENABLE
+static uint8_t raw_hid_in_buf[33];
+
 void raw_hid_send(uint8_t *data, uint8_t length)
 {
     (void)length;
-    usb_hw_ep2_in_send(data, 32);
+    raw_hid_in_buf[0] = REPORT_ID_RAW_HID;
+    for (uint8_t i = 0; i < 32; i++) {
+        raw_hid_in_buf[1 + i] = data[i];
+    }
+    usb_hw_ep2_in_send(raw_hid_in_buf, 33);
 }
 #endif
 
@@ -759,11 +766,13 @@ void usb_irq_dispatch(void)
         if (temp_usbif2 & _OEP2IF) {
             USBIF2 &= ~_OEP2IF;
 #ifdef VIAL_ENABLE
-            uint8_t length = OEP2CNT;
-            if (length > 32) {
+            uint8_t  length  = OEP2CNT;
+            uint8_t *payload = EP2_OUT_BUF;
+            if (length == 33 && payload[0] == REPORT_ID_RAW_HID) {
+                payload++;
                 length = 32;
             }
-            raw_hid_receive(EP2_OUT_BUF, length);
+            raw_hid_receive(payload, length);
 #endif
             SET_EP2_OUT_RDY;
         } else if (temp_usbif2 & _OEP1IF) {

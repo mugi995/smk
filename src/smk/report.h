@@ -20,6 +20,7 @@ enum report_id {
     REPORT_ID_ISP      = 5,
     REPORT_ID_NKRO     = 6,
     REPORT_ID_CONSOLE  = 7,
+    REPORT_ID_RAW_HID  = 8,
 };
 
 /*
