@@ -6,6 +6,13 @@
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 15
 
+enum custom_keycodes {
+    KB_BRI_UP = SAFE_RANGE,
+    KB_BRI_DN,
+
+    KB_SAFE_RANGE,
+};
+
 // Row Pin Bits
 #define KB_R0_P7_0 _P7_0
 #define KB_R1_P7_1 _P7_1

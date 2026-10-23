@@ -35,6 +35,11 @@ void user_init(void)
     GPIO_PULLUP_WRITE(7, KB_R_P7_MASK);
     GPIO_PULLUP_WRITE(5, KB_R_P5_MASK);
 
+    // LED SEG pins (PWM outputs)
+    GPIO_DIR_WRITE(1, 0x3F);
+    GPIO_DIR_WRITE(2, 0x3F);
+    GPIO_DIR_WRITE(3, 0x3F);
+
     // Encoder A/B (P0.5/P0.6): inputs with pull-ups.
     GPIO_HIGH(0, _P0_5 | _P0_6);
     GPIO_INPUT(0, _P0_5 | _P0_6);
