@@ -38,6 +38,19 @@ static void led_apply_brightness(void)
 
 static void led_pwm_init(void)
 {
+#ifdef LED_GPIO_TEST
+    // Diagnostic: disable PWM and drive the SEG pins as plain GPIO high.
+    // The matrix scan drives one COM (key column) low at a time, so the LEDs
+    // should light during the scan if P1/P2/P3 really are the SEG pins.
+    PWM00CON = 0x00;
+    PWM10CON = 0x00;
+    PWM20CON = 0x00;
+    P1       = 0xFF;
+    P2       = 0xFF;
+    P3       = 0xFF;
+    return;
+#endif
+
     PWM0PERDH = 0x04;
     PWM0PERDL = 0xB0;
     PWM1PERDH = 0x04;

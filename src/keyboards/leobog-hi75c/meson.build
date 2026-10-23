@@ -22,6 +22,7 @@ keyboards += {
             'no_serial' : '1',
             'usb_sw2con' : '1',
             'led_com_isr' : '1',
+            'led_gpio_test' : '1',
         },
     },
 }
