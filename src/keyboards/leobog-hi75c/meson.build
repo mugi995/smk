@@ -19,6 +19,7 @@ keyboards += {
         'options' : {
             'vendor_id' : '0x258a',
             'product_id' : '0x010c',
+            'no_serial' : '1',
         },
     },
 }

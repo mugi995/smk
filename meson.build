@@ -156,6 +156,10 @@ foreach keyboard, board : keyboards
             '-DLAYOUT_NAME="@0@"'.format(layout),
         ]
 
+        if options.get('no_serial', '') == '1'
+            cc_args += '-DUSB_NO_SERIAL=1'
+        endif
+
         foreach key, define : usb_string_defines
             value = get_option('usb_' + key)
             if value == ''

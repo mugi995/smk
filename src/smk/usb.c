@@ -190,19 +190,23 @@ const uint8_t hid_report_desc_extra[] = {
 };
 
 usb_desc_device_c usb_desc_device = {
-    .bLength            = sizeof(struct usb_desc_device),
-    .bDescriptorType    = USB_DESC_DEVICE,
-    .bcdUSB             = 0x0110,
-    .bDeviceClass       = USB_DEV_CLASS_PER_INTERFACE,
-    .bDeviceSubClass    = USB_DEV_SUBCLASS_PER_INTERFACE,
-    .bDeviceProtocol    = USB_DEV_PROTOCOL_PER_INTERFACE,
-    .bMaxPacketSize0    = 8,
-    .idVendor           = USB_VID,
-    .idProduct          = USB_PID,
-    .bcdDevice          = 0x0000,
-    .iManufacturer      = USB_STRING_MANUFACTURER,
-    .iProduct           = USB_STRING_PRODUCT,
-    .iSerialNumber      = USB_STRING_SERIAL_NUMBER,
+    .bLength         = sizeof(struct usb_desc_device),
+    .bDescriptorType = USB_DESC_DEVICE,
+    .bcdUSB          = 0x0110,
+    .bDeviceClass    = USB_DEV_CLASS_PER_INTERFACE,
+    .bDeviceSubClass = USB_DEV_SUBCLASS_PER_INTERFACE,
+    .bDeviceProtocol = USB_DEV_PROTOCOL_PER_INTERFACE,
+    .bMaxPacketSize0 = 8,
+    .idVendor        = USB_VID,
+    .idProduct       = USB_PID,
+    .bcdDevice       = 0x0000,
+    .iManufacturer   = USB_STRING_MANUFACTURER,
+    .iProduct        = USB_STRING_PRODUCT,
+#ifdef USB_NO_SERIAL
+    .iSerialNumber = 0,
+#else
+    .iSerialNumber = USB_STRING_SERIAL_NUMBER,
+#endif
     .bNumConfigurations = 1,
 };
 
