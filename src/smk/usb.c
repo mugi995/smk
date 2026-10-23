@@ -50,6 +50,7 @@ typedef enum {
     USB_EP0_STATE_LED         = 0x04,
     USB_EP0_STATE_ISP         = 0x05,
     USB_EP0_STATE_CONSOLE     = 0x06,
+    USB_EP0_STATE_RAW_HID     = 0x07,
 } usb_ep0_state_t;
 
 const uint8_t hid_report_desc_keyboard[] = {
@@ -112,7 +113,6 @@ const uint8_t hid_report_desc_extra[] = {
         HID_RI_REPORT_SIZE(8, 8),
         HID_RI_REPORT_COUNT(8, 32),
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
     HID_RI_END_COLLECTION(0),
 };
 // clang-format on
@@ -280,7 +280,7 @@ usb_desc_interface_c usb_desc_interface_extra = {
     .bDescriptorType   = USB_DESC_INTERFACE,
     .bInterfaceNumber  = 1,
     .bAlternateSetting = 0,
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
     .bNumEndpoints = 2,
 #else
     .bNumEndpoints = 1,
@@ -310,7 +310,7 @@ usb_desc_endpoint_c usb_desc_endpoint_extra = {
     .bInterval        = 1,  // 1ms
 };
 
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
 usb_desc_endpoint_c usb_desc_endpoint_raw_out = {
     .bLength          = sizeof(struct usb_desc_endpoint),
     .bDescriptorType  = USB_DESC_ENDPOINT,
@@ -338,7 +338,7 @@ usb_configuration_c usb_config = {
         {.interface = &usb_desc_interface_extra},
         {.hid = &usb_desc_hid_extra},
         {.endpoint = &usb_desc_endpoint_extra},
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
         {.endpoint = &usb_desc_endpoint_raw_out},
 #endif
         {0},
@@ -424,6 +424,11 @@ static __bit usb_isp_requested;
 #endif
 uint8_t         idle_time;
 usb_ep0_state_t usb_ep0_state;
+
+#ifdef VIAL_RAW_ONLY
+static uint8_t raw_hid_ep0_buf[32];
+static uint8_t raw_hid_ep0_len;
+#endif
 
 #define ENUM_QUIET_MS   500
 #define ENUM_NO_HOST_MS 500
@@ -927,14 +932,14 @@ static void usb_set_configuration_handler(struct usb_req_setup *req)
 
             if (active_configuration != 0) {
                 usb_device_state = USB_DEVICE_STATE_CONFIGURED;
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
                 USBIF2 &= ~_OEP2IF;
                 USBIE2 |= _OEP2IE;
                 SET_EP2_OUT_RDY;
 #endif
             } else {
                 usb_device_state = USB_DEVICE_STATE_ADDRESSED;
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
                 USBIE2 &= ~_OEP2IE;
 #endif
             }
@@ -962,7 +967,7 @@ static void usb_set_interface_handler(struct usb_req_setup *req)
             SET_EP0_IN_RDY;
             SET_EP0_OUT_STALL;
         } else if (req->wIndex == 1) {
-#ifdef VIAL_ENABLE
+#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
             if (active_configuration) {
                 USBIF2 &= ~_OEP2IF;
                 USBIE2 |= _OEP2IE;
@@ -1185,6 +1190,13 @@ static void usb_hid_set_report_handler(struct usb_req_setup *req)
                 usb_ep0_state = USB_EP0_STATE_LED;
                 SET_EP0_OUT_RDY;
             }
+#ifdef VIAL_RAW_ONLY
+            else if ((req->wIndex == 1) && (req->wValue == 0x0200) && (req->wLength == 32)) {
+                raw_hid_ep0_len = 0;
+                usb_ep0_state   = USB_EP0_STATE_RAW_HID;
+                SET_EP0_OUT_RDY;
+            }
+#endif
 
             break;
 
@@ -1279,6 +1291,20 @@ void usb_ep0_out_irq()
 
         CLEAR_EP0_CNT;
         SET_EP0_IN_RDY;
+#endif
+#ifdef VIAL_RAW_ONLY
+    } else if (usb_ep0_state == USB_EP0_STATE_RAW_HID) {
+        for (uint8_t i = 0; i < EP0_BUF_SIZE; i++) {
+            raw_hid_ep0_buf[raw_hid_ep0_len + i] = EP0_OUT_BUF[i];
+        }
+        raw_hid_ep0_len = (uint8_t)(raw_hid_ep0_len + EP0_BUF_SIZE);
+
+        if (raw_hid_ep0_len >= 32) {
+            usb_ep0_state = 0;
+            raw_hid_receive(raw_hid_ep0_buf, 32);
+            CLEAR_EP0_CNT;
+            SET_EP0_IN_RDY;
+        }
 #endif
     } else {
         usb_ep0_state = 0;
