@@ -113,6 +113,7 @@ const uint8_t hid_report_desc_extra[] = {
         HID_RI_REPORT_SIZE(8, 8),
         HID_RI_REPORT_COUNT(8, 32),
         HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
     HID_RI_END_COLLECTION(0),
 };
 // clang-format on
