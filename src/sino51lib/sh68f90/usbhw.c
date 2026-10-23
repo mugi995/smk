@@ -2,12 +2,17 @@
 #include "usb.h"
 #include "interrupts.h"
 #include "delay.h"
+#include "watchdog.h"
 #if DEBUG == 1
 #    include "report.h"
 #endif
 #include <stdint.h>
 
 #define EP_IN_DRAIN_TRIES 255
+
+#ifdef USB_IRQ_ACTIVITY
+volatile __bit usb_irq_activity;
+#endif
 
 static void set_ep1_in_buffer(uint8_t *src, uint8_t len)
 {
@@ -33,6 +38,9 @@ static void ep1_in_drain(void)
 {
     uint8_t tries = 0;
     while (tries < EP_IN_DRAIN_TRIES && (EP1CON & _IEP1RDY)) {
+#ifdef DELAY_NO_WATCHDOG_KICK
+        watchdog_kick(); // up to ~10 ms here, and delay_us does not kick
+#endif
         delay_us(40);
         tries++;
     }
@@ -42,6 +50,9 @@ static void ep2_in_drain(void)
 {
     uint8_t tries = 0;
     while (tries < EP_IN_DRAIN_TRIES && (EP2CON & _IEP2RDY)) {
+#ifdef DELAY_NO_WATCHDOG_KICK
+        watchdog_kick(); // up to ~10 ms here, and delay_us does not kick
+#endif
         delay_us(40);
         tries++;
     }
@@ -51,7 +62,11 @@ void usb_hw_init(void)
 {
     USBADDR = 0;
     USBIE1  = (_OVERIE | _SETUPIE | _SOFIA | _RESMIE | _SUSPIE | _PBRSTIE);
-    USBIE2  = (_OEP0IE | _IEP0IE);
+#ifdef VIA_ENABLE
+    USBIE2 = (_OEP0IE | _IEP0IE | _OEP2IE); // EP2 OUT: VIA's raw HID reports
+#else
+    USBIE2 = (_OEP0IE | _IEP0IE);
+#endif
 #ifdef USB_SW2CON
     USBCON = (_ENUSB | _SW1CON | _SW2CON);
 #else
@@ -89,6 +104,24 @@ void usb_hw_ep1_in_complete(void) {}
 void usb_hw_ep2_in_complete(void) {}
 
 #if DEBUG == 1
+#    ifdef VIA_ENABLE
+// The console report goes with the keyboard's, on EP1 (EP2 is VIA's).
+bool usb_hw_ep1_in_free(void)
+{
+    return !(EP1CON & _IEP1RDY);
+}
+
+void usb_hw_console_send(const __xdata uint8_t *data, uint8_t len)
+{
+    EP1_IN_BUF[0] = REPORT_ID_CONSOLE;
+    for (uint8_t i = 0; i < CONSOLE_REPORT_SIZE; i++) {
+        EP1_IN_BUF[1 + i] = (i < len) ? data[i] : 0;
+    }
+
+    SET_EP1_CNT(1 + CONSOLE_REPORT_SIZE);
+    SET_EP1_IN_RDY;
+}
+#    else
 bool usb_hw_ep2_in_free(void)
 {
     return !(EP2CON & _IEP2RDY);
@@ -104,6 +137,7 @@ void usb_hw_console_send(const __xdata uint8_t *data, uint8_t len)
     SET_EP2_CNT(1 + CONSOLE_REPORT_SIZE);
     SET_EP2_IN_RDY;
 }
+#    endif
 #endif
 
 void usb_interrupt_handler(void) __interrupt(_INT_USB)
@@ -112,6 +146,9 @@ void usb_interrupt_handler(void) __interrupt(_INT_USB)
     uint8_t saved_inscon   = INSCON;
     uint8_t saved_flashcon = FLASHCON;
 
+#ifdef USB_IRQ_ACTIVITY
+    usb_irq_activity = 1;
+#endif
     usb_irq_dispatch();
 
     FLASHCON = saved_flashcon; // restore banking SFRs (see top)

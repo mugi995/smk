@@ -132,23 +132,39 @@ foreach keyboard, board : keyboards
 
     if spec['settings_store'] == 'flash'
         settings_addr = marker_addr - spec['sector_size']
+        code_end = settings_addr
         platform_cc_args += [
-            '--code-size',
-            '@0@'.format(settings_addr),
             '-DFLASH_CFG_ADDR=@0@u'.format(settings_addr),
             '-DFLASH_CFG_SIZE=@0@u'.format(spec['sector_size']),
             '-DFLASH_MARKER_ADDR=@0@u'.format(marker_addr),
         ]
     else
         # settings live outside the program flash, so code may run up to the marker sector
-        platform_cc_args += ['--code-size', '@0@'.format(marker_addr)]
+        code_end = marker_addr
     endif
 
     foreach layout, variant : board['layouts']
         src_main = src_smk + src_libc + spec['src']
         inc_dirs = inc_base + [spec['dir']]
 
-        cc_args = cc_base_args + platform_cc_args + [
+        # A VIA layout keeps its keymap in the flash sectors right below the
+        # settings (dynamic_keymap.c), so its code ends that much lower.
+        layout_cc_args = []
+        layout_code_end = code_end
+        if variant.get('via', false)
+            # Flash sectors for the keymap VIA edits, below the settings (per layout).
+            keymap_sectors = variant.get('via_keymap_sectors', 2)
+            layout_code_end = code_end - keymap_sectors * spec['sector_size']
+            src_main += src_via
+            layout_cc_args += [
+                '-DVIA_ENABLE=1',
+                '-DDYNAMIC_KEYMAP_ADDR=@0@u'.format(layout_code_end),
+                '-DDYNAMIC_KEYMAP_SIZE=@0@u'.format(keymap_sectors * spec['sector_size']),
+                '-DDYNAMIC_KEYMAP_SECTOR_SIZE=@0@u'.format(spec['sector_size']),
+            ]
+        endif
+
+        cc_args = cc_base_args + platform_cc_args + ['--code-size', '@0@'.format(layout_code_end)] + layout_cc_args + [
             '-DWATCHDOG_ENABLE=@0@'.format(options['watchdog_enable']),
             '-DUSB_VID=@0@'.format(options['vendor_id']),
             '-DUSB_PID=@0@'.format(options['product_id']),
@@ -170,13 +186,6 @@ foreach keyboard, board : keyboards
 
         if options.get('led_gpio_test', '') == '1'
             cc_args += '-DLED_GPIO_TEST=1'
-        endif
-
-        if options.get('vial', '') == '1' and not get_option('nkro').enabled()
-            cc_args += '-DVIAL_ENABLE=1'
-            if options.get('vial_raw_only', '') == '1'
-                cc_args += '-DVIAL_RAW_ONLY=1'
-            endif
         endif
 
         foreach key, define : usb_string_defines

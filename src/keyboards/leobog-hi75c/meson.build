@@ -8,13 +8,19 @@ keyboards += {
             'user_matrix.c',
             'user_init.c',
             'user_sleep.c',
-            'vial.c',
             'kb.c',
         ),
         'layouts' : {
             'default' : {
                 'dir' : kb_dir / 'layouts/default',
                 'src' : files('layouts/default/layout.c'),
+            },
+            # VIA: the keymap is edited from VIA (raw HID on interface 0) and kept
+            # in flash; via.json is the definition to load into VIA.
+            'default-via' : {
+                'dir' : kb_dir / 'layouts/default',
+                'src' : files('layouts/default/layout.c'),
+                'via' : true,
             },
         },
         'options' : {
@@ -23,8 +29,6 @@ keyboards += {
             'no_serial' : '1',
             'usb_sw2con' : '1',
             'led_com_isr' : '1',
-            'vial' : '1',
-            'vial_raw_only' : '1',
         },
     },
 }

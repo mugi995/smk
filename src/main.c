@@ -17,6 +17,9 @@
 #include "tick.h"
 #include "sleep.h"
 #include "diag.h"
+#ifdef VIA_ENABLE
+#    include "dynamic_keymap.h"
+#endif
 #ifdef DEBUG_SINK_UART
 #    include "uart.h"
 #endif
@@ -37,6 +40,9 @@ void init(void)
 
     matrix_init();
     keyboard_init();
+#ifdef VIA_ENABLE
+    dynamic_keymap_init(); // before anything looks a key up
+#endif
     usb_init();
     indicators_init();
 
@@ -103,6 +109,9 @@ void main(void)
 
         usb_task();
         settings_task();
+#ifdef VIA_ENABLE
+        dynamic_keymap_task();
+#endif
         sleep_task();
 
 #if DEBUG == 1
