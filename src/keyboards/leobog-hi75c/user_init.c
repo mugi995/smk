@@ -4,10 +4,11 @@
 
 void user_init(void)
 {
-    // Columns idle high; the matrix scan pulls one low at a time.
+    // All latches high: columns idle high and the input pins stay readable.
     GPIO_WRITE(6, 0xFF);
-    GPIO_WRITE(5, KB_C_P5_MASK);
-    GPIO_WRITE(4, KB_C_P4_MASK);
+    GPIO_WRITE(5, 0xFF);
+    GPIO_WRITE(4, 0xFF);
+    GPIO_WRITE(7, 0xFF);
 
     GPIO_DIR_WRITE(6, 0xFF);         // C0..C7
     GPIO_DIR_WRITE(5, KB_C_P5_MASK); // C8..C11; R4/R5 stay inputs
