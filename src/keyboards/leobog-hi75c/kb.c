@@ -12,6 +12,7 @@
 static uint8_t  enc_prev;
 static int8_t   enc_acc;
 static uint16_t led_brightness = 512;
+static uint8_t  led_col;
 
 static void led_apply_brightness(void)
 {
@@ -65,6 +66,23 @@ static void led_pwm_init(void)
     PWM20CON = 0x89;
 
     led_apply_brightness();
+
+    PWM00CON |= 0x40; // PWM0IE
+    IEN1 |= _EPWM0;
+}
+
+// Called from pwm_interrupt_handler() (the PWM0 vector in src/sino51lib/pwm.c).
+void led_scan_isr(void)
+{
+    // Clear PWM0 period interrupt flag (PWM0IF, bit5).
+    PWM00CON &= (uint8_t)~0x20;
+
+    user_matrix_col_deselect(led_col);
+    led_col++;
+    if (led_col >= 15) {
+        led_col = 0;
+    }
+    user_matrix_col_select(led_col);
 }
 
 void kb_init(void)
@@ -96,12 +114,6 @@ void kb_update(void)
     } else if (enc_acc <= -4) {
         enc_acc = 0;
         enc_step(KC_AUDIO_VOL_DOWN);
-    }
-
-    for (uint8_t col = 0; col < 15; col++) {
-        user_matrix_col_select(col);
-        delay_us(100);
-        user_matrix_col_deselect(col);
     }
 }
 

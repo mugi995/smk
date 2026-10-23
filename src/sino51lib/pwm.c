@@ -4,6 +4,15 @@
 
 #    include "interrupts.h"
 
-void pwm_interrupt_handler(void) __interrupt(PWM_VECTOR) {}
+#    ifdef LED_COM_ISR
+void led_scan_isr(void);
+#    endif
+
+void pwm_interrupt_handler(void) __interrupt(PWM_VECTOR)
+{
+#    ifdef LED_COM_ISR
+    led_scan_isr();
+#    endif
+}
 
 #endif

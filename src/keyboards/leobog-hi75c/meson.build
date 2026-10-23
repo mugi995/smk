@@ -21,6 +21,7 @@ keyboards += {
             'product_id' : '0x010c',
             'no_serial' : '1',
             'usb_sw2con' : '1',
+            'led_com_isr' : '1',
         },
     },
 }

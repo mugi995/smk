@@ -164,6 +164,10 @@ foreach keyboard, board : keyboards
             cc_args += '-DUSB_SW2CON=1'
         endif
 
+        if options.get('led_com_isr', '') == '1'
+            cc_args += '-DLED_COM_ISR=1'
+        endif
+
         foreach key, define : usb_string_defines
             value = get_option('usb_' + key)
             if value == ''
