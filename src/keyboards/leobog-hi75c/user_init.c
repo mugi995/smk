@@ -1,9 +1,24 @@
 #include "kbdef.h"
+#include "delay.h"
 #include "gpio.h"
 #include "user_init.h"
+#include "utils.h"
 
 void user_init(void)
 {
+    // A bootloader reboot leaves the USB core in its previous state, and the
+    // host can miss the detach if we re-attach immediately. Reset the core and
+    // stay disconnected long enough for the host to notice before usb_init().
+    USBCON = _SWRST;
+    _nop_();
+    _nop_();
+    _nop_();
+    _nop_();
+    _nop_();
+    _nop_();
+    USBCON = 0;
+    delay_ms(200);
+
     // All latches high: columns idle high and the input pins stay readable.
     GPIO_WRITE(6, 0xFF);
     GPIO_WRITE(5, 0xFF);
