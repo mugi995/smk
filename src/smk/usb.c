@@ -100,6 +100,23 @@ const uint8_t hid_report_desc_keyboard[] = {
     // clang-format on
 };
 
+#ifdef VIAL_RAW_ONLY
+// clang-format off
+const uint8_t hid_report_desc_extra[] = {
+    HID_RI_USAGE_PAGE(16, 0xff60),
+    HID_RI_USAGE(8, 0x61),
+    HID_RI_COLLECTION(8, 0x01),
+        HID_RI_USAGE(8, 0x62),
+        HID_RI_LOGICAL_MINIMUM(8, 0x00),
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
+        HID_RI_REPORT_SIZE(8, 8),
+        HID_RI_REPORT_COUNT(8, 32),
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+    HID_RI_END_COLLECTION(0),
+};
+// clang-format on
+#else
 const uint8_t hid_report_desc_extra[] = {
     // clang-format off
     HID_RI_USAGE_PAGE(8, 0x01),           // Generic Desktop
@@ -204,6 +221,7 @@ const uint8_t hid_report_desc_extra[] = {
 
     // clang-format on
 };
+#endif // VIAL_RAW_ONLY
 
 usb_desc_device_c usb_desc_device = {
     .bLength         = sizeof(struct usb_desc_device),
@@ -475,6 +493,13 @@ void usb_send_extra(__xdata report_extra_t *report)
 }
 
 #ifdef VIAL_ENABLE
+#    ifdef VIAL_RAW_ONLY
+void raw_hid_send(uint8_t *data, uint8_t length)
+{
+    (void)length;
+    usb_hw_ep2_in_send(data, 32);
+}
+#    else
 static uint8_t raw_hid_in_buf[33];
 
 void raw_hid_send(uint8_t *data, uint8_t length)
@@ -486,6 +511,7 @@ void raw_hid_send(uint8_t *data, uint8_t length)
     }
     usb_hw_ep2_in_send(raw_hid_in_buf, 33);
 }
+#    endif
 #endif
 
 void usb_wait_for_enumeration(void)
@@ -766,6 +792,9 @@ void usb_irq_dispatch(void)
         if (temp_usbif2 & _OEP2IF) {
             USBIF2 &= ~_OEP2IF;
 #ifdef VIAL_ENABLE
+#    ifdef VIAL_RAW_ONLY
+            raw_hid_receive(EP2_OUT_BUF, 32);
+#    else
             uint8_t  length  = OEP2CNT;
             uint8_t *payload = EP2_OUT_BUF;
             if (length == 33 && payload[0] == REPORT_ID_RAW_HID) {
@@ -773,6 +802,7 @@ void usb_irq_dispatch(void)
                 length = 32;
             }
             raw_hid_receive(payload, length);
+#    endif
 #endif
             SET_EP2_OUT_RDY;
         } else if (temp_usbif2 & _OEP1IF) {

@@ -24,6 +24,7 @@ keyboards += {
             'usb_sw2con' : '1',
             'led_com_isr' : '1',
             'vial' : '1',
+            'vial_raw_only' : '1',
         },
     },
 }

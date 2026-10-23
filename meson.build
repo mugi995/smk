@@ -174,6 +174,9 @@ foreach keyboard, board : keyboards
 
         if options.get('vial', '') == '1' and not get_option('nkro').enabled()
             cc_args += '-DVIAL_ENABLE=1'
+            if options.get('vial_raw_only', '') == '1'
+                cc_args += '-DVIAL_RAW_ONLY=1'
+            endif
         endif
 
         foreach key, define : usb_string_defines
