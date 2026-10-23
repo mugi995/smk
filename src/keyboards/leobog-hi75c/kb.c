@@ -49,7 +49,7 @@ static void led_pwm_init(void)
     P2       = 0xFF;
     P3       = 0xFF;
     return;
-#endif
+#else
 
     PWM0PERDH = 0x04;
     PWM0PERDL = 0xB0;
@@ -82,6 +82,7 @@ static void led_pwm_init(void)
 
     PWM00CON |= 0x40; // PWM0IE
     IEN1 |= _EPWM0;
+#endif
 }
 
 // Called from pwm_interrupt_handler() (the PWM0 vector in src/sino51lib/pwm.c).
