@@ -17,6 +17,10 @@ void usb_send_report(__xdata report_keyboard_t *report);
 void usb_send_nkro(__xdata report_nkro_t *report);
 void usb_send_extra(__xdata report_extra_t *report);
 
+void raw_hid_send(uint8_t *data, uint8_t length);
+void raw_hid_receive(uint8_t *data, uint8_t length);
+void raw_hid_task(void);
+
 bool    usb_is_configured(void);
 uint8_t usb_device_state_get_protocol(void);
 

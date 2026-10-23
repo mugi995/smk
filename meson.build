@@ -172,6 +172,10 @@ foreach keyboard, board : keyboards
             cc_args += '-DLED_GPIO_TEST=1'
         endif
 
+        if options.get('vial', '') == '1' and not get_option('nkro').enabled()
+            cc_args += '-DVIAL_ENABLE=1'
+        endif
+
         foreach key, define : usb_string_defines
             value = get_option('usb_' + key)
             if value == ''

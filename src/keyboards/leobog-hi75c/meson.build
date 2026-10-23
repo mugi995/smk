@@ -8,6 +8,7 @@ keyboards += {
             'user_matrix.c',
             'user_init.c',
             'user_sleep.c',
+            'vial.c',
             'kb.c',
         ),
         'layouts' : {
@@ -22,6 +23,7 @@ keyboards += {
             'no_serial' : '1',
             'usb_sw2con' : '1',
             'led_com_isr' : '1',
+            'vial' : '1',
         },
     },
 }
