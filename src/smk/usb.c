@@ -281,7 +281,7 @@ usb_desc_interface_c usb_desc_interface_extra = {
     .bDescriptorType   = USB_DESC_INTERFACE,
     .bInterfaceNumber  = 1,
     .bAlternateSetting = 0,
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
     .bNumEndpoints = 2,
 #else
     .bNumEndpoints = 1,
@@ -311,13 +311,13 @@ usb_desc_endpoint_c usb_desc_endpoint_extra = {
     .bInterval        = 1,  // 1ms
 };
 
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
 usb_desc_endpoint_c usb_desc_endpoint_raw_out = {
     .bLength          = sizeof(struct usb_desc_endpoint),
     .bDescriptorType  = USB_DESC_ENDPOINT,
     .bEndpointAddress = 2 | USB_DIR_OUT,
     .bmAttributes     = USB_XFER_INTERRUPT,
-    .wMaxPacketSize   = 64,
+    .wMaxPacketSize   = 32,
     .bInterval        = 1,
 };
 #endif
@@ -339,7 +339,7 @@ usb_configuration_c usb_config = {
         {.interface = &usb_desc_interface_extra},
         {.hid = &usb_desc_hid_extra},
         {.endpoint = &usb_desc_endpoint_extra},
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
         {.endpoint = &usb_desc_endpoint_raw_out},
 #endif
         {0},
@@ -933,14 +933,14 @@ static void usb_set_configuration_handler(struct usb_req_setup *req)
 
             if (active_configuration != 0) {
                 usb_device_state = USB_DEVICE_STATE_CONFIGURED;
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
                 USBIF2 &= ~_OEP2IF;
                 USBIE2 |= _OEP2IE;
                 SET_EP2_OUT_RDY;
 #endif
             } else {
                 usb_device_state = USB_DEVICE_STATE_ADDRESSED;
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
                 USBIE2 &= ~_OEP2IE;
 #endif
             }
@@ -968,7 +968,7 @@ static void usb_set_interface_handler(struct usb_req_setup *req)
             SET_EP0_IN_RDY;
             SET_EP0_OUT_STALL;
         } else if (req->wIndex == 1) {
-#if defined(VIAL_ENABLE) && !defined(VIAL_RAW_ONLY)
+#ifdef VIAL_ENABLE
             if (active_configuration) {
                 USBIF2 &= ~_OEP2IF;
                 USBIE2 |= _OEP2IE;
