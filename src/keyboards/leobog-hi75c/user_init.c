@@ -35,6 +35,11 @@ void user_init(void)
     GPIO_PULLUP_WRITE(7, KB_R_P7_MASK);
     GPIO_PULLUP_WRITE(5, KB_R_P5_MASK);
 
+    // Encoder A/B (P0.5/P0.6): inputs with pull-ups.
+    GPIO_HIGH(0, _P0_5 | _P0_6);
+    GPIO_INPUT(0, _P0_5 | _P0_6);
+    GPIO_PULLUP_ON(0, _P0_5 | _P0_6);
+
     // Stock firmware leaves P5 at the default drive strength.
     DRVCON = DRVCON_UNLOCK_P5;
     P5DRV  = 0x00;
