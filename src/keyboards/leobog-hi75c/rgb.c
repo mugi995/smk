@@ -1,4 +1,4 @@
-﻿// Uniform-colour RGB: every key gets the same colour. The LED scan only
+// Uniform-colour RGB: every key gets the same colour. The LED scan only
 // switches the COM line (as in v0.5.0); the 18 PWM duties are written by
 // rgb_apply() only when Vial/VIA changes the colour or brightness. There is no
 // per-key data, no animation, and no extra work in the scan interrupt.
@@ -145,6 +145,79 @@ void rgb_init(void)
     SET_PWM_DUTY_1(PWM02, rgb_duty_base[17]);
 
     rgb_apply();
+}
+
+// Called around matrix_scan_full(). The key scan drives the same COM lines, so
+// leave the LEDs dark while it runs; otherwise each scanned column shows one
+// column of the colour and the display flickers at the key-scan rate.
+void rgb_scan_pause(void)
+{
+    PWM00CON &= (uint8_t)~0x40; // PWM0 period interrupt off
+
+    SET_PWM_DUTY_1(PWM20, 0);
+    SET_PWM_DUTY_2(PWM20, 0);
+    SET_PWM_DUTY_1(PWM21, 0);
+    SET_PWM_DUTY_2(PWM21, 0);
+    SET_PWM_DUTY_1(PWM22, 0);
+    SET_PWM_DUTY_2(PWM22, 0);
+    SET_PWM_DUTY_1(PWM23, 0);
+    SET_PWM_DUTY_2(PWM23, 0);
+    SET_PWM_DUTY_1(PWM24, 0);
+    SET_PWM_DUTY_2(PWM24, 0);
+    SET_PWM_DUTY_1(PWM25, 0);
+    SET_PWM_DUTY_2(PWM25, 0);
+    SET_PWM_DUTY_1(PWM10, 0);
+    SET_PWM_DUTY_2(PWM10, 0);
+    SET_PWM_DUTY_1(PWM11, 0);
+    SET_PWM_DUTY_2(PWM11, 0);
+    SET_PWM_DUTY_1(PWM12, 0);
+    SET_PWM_DUTY_2(PWM12, 0);
+    SET_PWM_DUTY_1(PWM13, 0);
+    SET_PWM_DUTY_2(PWM13, 0);
+    SET_PWM_DUTY_1(PWM14, 0);
+    SET_PWM_DUTY_2(PWM14, 0);
+    SET_PWM_DUTY_1(PWM15, 0);
+    SET_PWM_DUTY_2(PWM15, 0);
+    SET_PWM_DUTY_1(PWM03, 0);
+    SET_PWM_DUTY_2(PWM03, 0);
+    SET_PWM_DUTY_1(PWM04, 0);
+    SET_PWM_DUTY_2(PWM04, 0);
+    SET_PWM_DUTY_1(PWM05, 0);
+    SET_PWM_DUTY_2(PWM05, 0);
+    SET_PWM_DUTY_1(PWM00, 0);
+    SET_PWM_DUTY_2(PWM00, 0);
+    SET_PWM_DUTY_1(PWM01, 0);
+    SET_PWM_DUTY_2(PWM01, 0);
+    SET_PWM_DUTY_1(PWM02, 0);
+    SET_PWM_DUTY_2(PWM02, 0);
+}
+
+void rgb_scan_resume(void)
+{
+    // Restore the stock DUTY1 offsets and the uniform DUTY2 values, then let
+    // the COM scan continue.
+    SET_PWM_DUTY_1(PWM20, rgb_duty_base[0]);
+    SET_PWM_DUTY_1(PWM21, rgb_duty_base[1]);
+    SET_PWM_DUTY_1(PWM22, rgb_duty_base[2]);
+    SET_PWM_DUTY_1(PWM23, rgb_duty_base[3]);
+    SET_PWM_DUTY_1(PWM24, rgb_duty_base[4]);
+    SET_PWM_DUTY_1(PWM25, rgb_duty_base[5]);
+    SET_PWM_DUTY_1(PWM10, rgb_duty_base[6]);
+    SET_PWM_DUTY_1(PWM11, rgb_duty_base[7]);
+    SET_PWM_DUTY_1(PWM12, rgb_duty_base[8]);
+    SET_PWM_DUTY_1(PWM13, rgb_duty_base[9]);
+    SET_PWM_DUTY_1(PWM14, rgb_duty_base[10]);
+    SET_PWM_DUTY_1(PWM15, rgb_duty_base[11]);
+    SET_PWM_DUTY_1(PWM03, rgb_duty_base[12]);
+    SET_PWM_DUTY_1(PWM04, rgb_duty_base[13]);
+    SET_PWM_DUTY_1(PWM05, rgb_duty_base[14]);
+    SET_PWM_DUTY_1(PWM00, rgb_duty_base[15]);
+    SET_PWM_DUTY_1(PWM01, rgb_duty_base[16]);
+    SET_PWM_DUTY_1(PWM02, rgb_duty_base[17]);
+
+    rgb_apply();
+
+    PWM00CON |= 0x40; // PWM0 period interrupt on
 }
 
 void rgb_save(void)

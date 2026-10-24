@@ -1,9 +1,11 @@
-﻿#pragma once
+#pragma once
 
 #include <stdint.h>
 
 void rgb_init(void);
 void rgb_apply(void);
+void rgb_scan_pause(void);
+void rgb_scan_resume(void);
 void rgb_save(void);
 void rgb_brightness_step(int8_t delta);
 void rgb_vial_get(__xdata uint8_t *data);
