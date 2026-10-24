@@ -143,6 +143,8 @@ void kb_update(void)
         enc_acc = 0;
         enc_step(0);
     }
+
+    rgb_task();
 }
 
 bool kb_process_record(uint16_t keycode, bool key_pressed)

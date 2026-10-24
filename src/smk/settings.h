@@ -15,9 +15,19 @@ typedef struct {
     uint8_t rf_link;
     // Encoder keycodes: [layer][direction], 0 = the board default.
     uint16_t encoder[2][2];
+    // RGB: VialRGB effect id, speed, and base HSV.
+    uint8_t rgb_mode;
+    uint8_t rgb_speed;
+    uint8_t rgb_hue;
+    uint8_t rgb_sat;
+    uint8_t rgb_val;
 } user_settings_t;
 
 extern user_settings_t user_settings;
+
+// True when settings_load() found a valid record. The board init uses this to
+// apply defaults only when nothing valid has been stored.
+extern bool settings_loaded;
 
 bool settings_load(void);
 
