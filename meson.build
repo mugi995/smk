@@ -162,6 +162,11 @@ foreach keyboard, board : keyboards
                 '-DDYNAMIC_KEYMAP_SIZE=@0@u'.format(keymap_sectors * spec['sector_size']),
                 '-DDYNAMIC_KEYMAP_SECTOR_SIZE=@0@u'.format(spec['sector_size']),
             ]
+            if variant.get('vial', false)
+                # Vial's 0xFE commands on top of VIA; VIA_PROTOCOL_VERSION
+                # reports 0x0009 for the Vial GUI.
+                layout_cc_args += '-DVIAL_ENABLE=1'
+            endif
         endif
 
         cc_args = cc_base_args + platform_cc_args + ['--code-size', '@0@'.format(layout_code_end)] + layout_cc_args + [
