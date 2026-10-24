@@ -10,7 +10,7 @@
 #define RGB_ENABLE 1
 
 // The layers of keymaps[] (layouts/default/layout.c): VIA edits this many.
-#define DYNAMIC_KEYMAP_LAYER_COUNT 2
+#define DYNAMIC_KEYMAP_LAYER_COUNT 5
 
 enum custom_keycodes {
     KB_BRI_UP = SAFE_RANGE,
