@@ -13,9 +13,9 @@
 // > 1200), so cap the brightness below that.
 #define RGB_MAX_VAL 240
 
-// Stock duty offset: DUTY1 = 0xB4 + SEG, DUTY2 = DUTY1 + 4 * colour.
+// DUTY1 = 0, matching v0.5.0. DUTY2 carries 4 * colour.
 static const uint16_t __code rgb_duty_base[18] = {
-    0xB4 + 0, 0xB4 + 1, 0xB4 + 2, 0xB4 + 3, 0xB4 + 4, 0xB4 + 5, 0xB4 + 6, 0xB4 + 7, 0xB4 + 8, 0xB4 + 9, 0xB4 + 10, 0xB4 + 11, 0xB4 + 12, 0xB4 + 13, 0xB4 + 14, 0xB4 + 15, 0xB4 + 16, 0xB4 + 17,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 };
 
 // Standard 6-sector HSV -> RGB, 8 bits per channel. s == 0 is grey/white.
