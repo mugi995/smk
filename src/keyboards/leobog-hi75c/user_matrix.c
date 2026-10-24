@@ -2,6 +2,14 @@
 #include "gpio.h"
 #include "user_matrix.h"
 
+// Column COM pins: C0-C7 = P6.0-P6.7, C8-C11 = P5.0/P5.1/P5.2/P5.7,
+// C12-C14 = P4.0/P4.2/P4.3. The tables replace the 15-case switches in the PWM
+// and key-scan paths.
+static const uint8_t __code col_port[15] = {6, 6, 6, 6, 6, 6, 6, 6, 5, 5, 5, 5, 4, 4, 4};
+static const uint8_t __code col_mask[15] = {
+    0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x01, 0x02, 0x04, 0x80, 0x01, 0x04, 0x08,
+};
+
 void user_matrix_cols_deselect_all(void)
 {
     GPIO_HIGH(6, KB_C_P6_MASK);
@@ -11,102 +19,34 @@ void user_matrix_cols_deselect_all(void)
 
 void user_matrix_col_select(uint8_t col)
 {
-    switch (col) {
-        case 0:
-            KB_C0 = 0;
-            break;
-        case 1:
-            KB_C1 = 0;
-            break;
-        case 2:
-            KB_C2 = 0;
-            break;
-        case 3:
-            KB_C3 = 0;
-            break;
+    const uint8_t mask = col_mask[col];
+
+    switch (col_port[col]) {
         case 4:
-            KB_C4 = 0;
+            P4 &= (uint8_t)~mask;
             break;
         case 5:
-            KB_C5 = 0;
+            P5 &= (uint8_t)~mask;
             break;
-        case 6:
-            KB_C6 = 0;
-            break;
-        case 7:
-            KB_C7 = 0;
-            break;
-        case 8:
-            KB_C8 = 0;
-            break;
-        case 9:
-            KB_C9 = 0;
-            break;
-        case 10:
-            KB_C10 = 0;
-            break;
-        case 11:
-            KB_C11 = 0;
-            break;
-        case 12:
-            KB_C12 = 0;
-            break;
-        case 13:
-            KB_C13 = 0;
-            break;
-        case 14:
-            KB_C14 = 0;
+        default:
+            P6 &= (uint8_t)~mask;
             break;
     }
 }
 
 void user_matrix_col_deselect(uint8_t col)
 {
-    switch (col) {
-        case 0:
-            KB_C0 = 1;
-            break;
-        case 1:
-            KB_C1 = 1;
-            break;
-        case 2:
-            KB_C2 = 1;
-            break;
-        case 3:
-            KB_C3 = 1;
-            break;
+    const uint8_t mask = col_mask[col];
+
+    switch (col_port[col]) {
         case 4:
-            KB_C4 = 1;
+            P4 |= mask;
             break;
         case 5:
-            KB_C5 = 1;
+            P5 |= mask;
             break;
-        case 6:
-            KB_C6 = 1;
-            break;
-        case 7:
-            KB_C7 = 1;
-            break;
-        case 8:
-            KB_C8 = 1;
-            break;
-        case 9:
-            KB_C9 = 1;
-            break;
-        case 10:
-            KB_C10 = 1;
-            break;
-        case 11:
-            KB_C11 = 1;
-            break;
-        case 12:
-            KB_C12 = 1;
-            break;
-        case 13:
-            KB_C13 = 1;
-            break;
-        case 14:
-            KB_C14 = 1;
+        default:
+            P6 |= mask;
             break;
     }
 }

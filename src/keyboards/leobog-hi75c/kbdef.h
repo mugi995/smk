@@ -6,6 +6,10 @@
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 15
 
+// Per-key RGB driver (rgb.c). matrix.c uses this to pause the LED scan while
+// the key scan drives the same column lines.
+#define RGB_ENABLE 1
+
 // The layers of keymaps[] (layouts/default/layout.c): VIA edits this many.
 #define DYNAMIC_KEYMAP_LAYER_COUNT 2
 

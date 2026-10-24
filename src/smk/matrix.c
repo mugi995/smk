@@ -6,6 +6,9 @@
 #include "kb.h"
 #include "user_matrix.h"
 #include "kbdef.h"
+#ifdef RGB_ENABLE
+#    include "rgb.h"
+#endif
 #include "host.h"
 #include "delay.h"
 #include "indicators.h"
@@ -138,6 +141,13 @@ void matrix_scan_full(void)
     user_matrix_scan_pre();
     user_matrix_cols_deselect_all();
 
+#ifdef RGB_ENABLE
+    // The key scan drives the same COM lines as the LED scan: stop the LED
+    // interrupt and zero the duties so each scanned column cannot show the
+    // previous column's colour.
+    rgb_scan_pause();
+#endif
+
     for (uint8_t col = 0; col < MATRIX_COLS; col++) {
         user_matrix_col_select(col);
 
@@ -152,6 +162,10 @@ void matrix_scan_full(void)
 
         user_matrix_col_deselect(col);
     }
+
+#ifdef RGB_ENABLE
+    rgb_scan_resume();
+#endif
 
     user_matrix_scan_post();
 
