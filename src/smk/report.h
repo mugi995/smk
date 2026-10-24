@@ -12,15 +12,23 @@
 
 #define EXTRA_REPORT_SIZE 3
 
-#define CONSOLE_REPORT_SIZE 32
+#ifdef VIA_ENABLE
+// With VIA the console shares the keyboard's endpoint, EP1 (16 bytes a packet).
+#    define CONSOLE_REPORT_SIZE 15
+#else
+#    define CONSOLE_REPORT_SIZE 32
+#endif
 
 enum report_id {
     REPORT_ID_SYSTEM   = 1,
     REPORT_ID_CONSUMER = 2,
-    REPORT_ID_ISP      = 5,
-    REPORT_ID_NKRO     = 6,
-    REPORT_ID_CONSOLE  = 7,
-    REPORT_ID_RAW_HID  = 8,
+#ifdef VIA_ENABLE
+    REPORT_ID_KEYBOARD = 3, // the 6KRO report, when it shares its interface (VIA)
+#endif
+    REPORT_ID_ISP     = 5,
+    REPORT_ID_NKRO    = 6,
+    REPORT_ID_CONSOLE = 7,
+    REPORT_ID_RAW_HID = 8, // Vial's raw HID report (kept for the Vial tree)
 };
 
 /*

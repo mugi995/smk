@@ -17,10 +17,6 @@ void usb_send_report(__xdata report_keyboard_t *report);
 void usb_send_nkro(__xdata report_nkro_t *report);
 void usb_send_extra(__xdata report_extra_t *report);
 
-void raw_hid_send(uint8_t *data, uint8_t length);
-void raw_hid_receive(uint8_t *data, uint8_t length);
-void raw_hid_task(void);
-
 bool    usb_is_configured(void);
 uint8_t usb_device_state_get_protocol(void);
 
@@ -33,6 +29,19 @@ void usb_task(void);
 void usb_irq_dispatch(void);
 
 extern __bit usb_suspended;
+
+#ifdef USB_ISP_PREPARE
+// Board hook, run by usb_task() right before the report-5 ISP jump: stop what
+// must not keep running under the bootloader (aula-f65-v1: the LED PWM).
+void usb_isp_prepare(void);
+#endif
+
+#ifdef USB_WAKE_ON_KEY
+// For a board that stays awake while the bus is suspended: call when a key goes
+// down. If the host suspended the bus and enabled remote wakeup, this signals
+// resume (USBCON.WKUP), once per suspend.
+void usb_wake_host(void);
+#endif
 
 #if DEBUG == 1
 bool usb_console_ready(void);

@@ -4,13 +4,25 @@
 #ifdef ISP_ENABLE
 #    include "isp.h"
 #endif
+
+// Highest consumer usage the report descriptor allows (a board may raise it,
+// e.g. to 0x2FF for Mission Control 0x29F / Launchpad 0x2A0).
+#ifndef CONSUMER_USAGE_MAX
+#    define CONSUMER_USAGE_MAX 0x023c
+#endif
 #include "usbdef.h"
 #include "debug.h"
 #include "utils.h"
 #include "usbhidreport.h"
 #include "console.h"
 #include "keyboard.h"
+#ifdef USB_INIT_GATE
+#    include "kb.h"
+#endif
 #include "delay.h"
+#ifdef VIA_ENABLE
+#    include "via.h"
+#endif
 #include <stdint.h>
 #include <string.h>
 
@@ -43,6 +55,13 @@ enum usb_string_index {
     USB_STRING_SERIAL_NUMBER = 3,
 };
 
+#ifdef USB_NO_SERIAL
+// No serial string: the device descriptor's iSerialNumber stays 0.
+#    define USB_SERIAL_STRING_INDEX 0
+#else
+#    define USB_SERIAL_STRING_INDEX USB_STRING_SERIAL_NUMBER
+#endif
+
 typedef enum {
     USB_EP0_STATE_DEFAULT     = 0x00,
     USB_EP0_STATE_IN_DATA     = 0x01,
@@ -50,132 +69,153 @@ typedef enum {
     USB_EP0_STATE_LED         = 0x04,
     USB_EP0_STATE_ISP         = 0x05,
     USB_EP0_STATE_CONSOLE     = 0x06,
-    USB_EP0_STATE_RAW_HID     = 0x07,
 } usb_ep0_state_t;
 
+// clang-format off
+#ifdef APPLE_FN
+#    define KEYBOARD_APPLE_FN_ITEMS \
+        /* Apple fn (1 byte), as on Apple keyboards */ \
+        HID_RI_USAGE_PAGE(8, 0xFF), \
+        HID_RI_USAGE(8, 0x03), \
+        HID_RI_REPORT_SIZE(8, 0x08), \
+        HID_RI_REPORT_COUNT(8, 0x01), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+#else
+#    define KEYBOARD_APPLE_FN_ITEMS
+#endif
+
+// The 6KRO keyboard report's items, inside its Application collection.
+#define KEYBOARD_REPORT_ITEMS \
+        /* Modifiers (8 bits) */ \
+        HID_RI_USAGE_PAGE(8, 0x07),     /* Keyboard/Keypad */ \
+        HID_RI_USAGE_MINIMUM(8, 0xe0),  /* Keyboard Left Control */ \
+        HID_RI_USAGE_MAXIMUM(8, 0xe7),  /* Keyboard Right Gui */ \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(8, 0x01), \
+        HID_RI_REPORT_SIZE(8, 0x01), \
+        HID_RI_REPORT_COUNT(8, 0x08), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE), \
+ \
+        /* Reserved (1 byte) */ \
+        HID_RI_REPORT_SIZE(8, 0x08), \
+        HID_RI_REPORT_COUNT(8, 0x01), \
+        HID_RI_INPUT(8, HID_IOF_CONSTANT), \
+ \
+        /* Keycodes (6 bytes, or 5 with APPLE_FN) */ \
+        HID_RI_USAGE_PAGE(8, 0x07),    /* Keyboard/Keypad */ \
+        HID_RI_USAGE_MINIMUM(8, 0x00), \
+        HID_RI_USAGE_MAXIMUM(8, 0xFF), \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00FF), \
+        HID_RI_REPORT_SIZE(8, 0x08), \
+        HID_RI_REPORT_COUNT(8, KEYBOARD_REPORT_KEYS), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_ARRAY | HID_IOF_ABSOLUTE), \
+ \
+        KEYBOARD_APPLE_FN_ITEMS \
+ \
+        /* Status LEDs (5 bits) */ \
+        HID_RI_USAGE_PAGE(8, 0x08),    /* LED */ \
+        HID_RI_USAGE_MINIMUM(8, 0x01), /* Num Lock */ \
+        HID_RI_USAGE_MAXIMUM(8, 0x05), /* Kana */ \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(8, 0x01), \
+        HID_RI_REPORT_SIZE(8, 0x01), \
+        HID_RI_REPORT_COUNT(8, 0x05), \
+        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE | HID_IOF_NON_VOLATILE), \
+ \
+        /* LED padding (3 bits) */ \
+        HID_RI_REPORT_SIZE(8, 0x03), \
+        HID_RI_REPORT_COUNT(8, 0x01), \
+        HID_RI_OUTPUT(8, HID_IOF_CONSTANT),
+// clang-format on
+
+#ifndef VIA_ENABLE
 const uint8_t hid_report_desc_keyboard[] = {
     // clang-format off
     HID_RI_USAGE_PAGE(8, 0x01),     // Generic Desktop Controls
     HID_RI_USAGE(8, 0x06),          // System Control
     HID_RI_COLLECTION(8, 0x01),     // Application
-        // Modifiers (8 bits)
-        HID_RI_USAGE_PAGE(8, 0x07),     // Keyboard/Keypad
-        HID_RI_USAGE_MINIMUM(8, 0xe0),  // Keyboard Left Control
-        HID_RI_USAGE_MAXIMUM(8, 0xe7),  // Keyboard Right Gui
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-        HID_RI_REPORT_SIZE(8, 0x01),
-        HID_RI_REPORT_COUNT(8, 0x08),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-
-        // Reserved (1 byte)
-        HID_RI_REPORT_SIZE(8, 0x08),
-        HID_RI_REPORT_COUNT(8, 0x01),
-        HID_RI_INPUT(8, HID_IOF_CONSTANT),
-
-        // Keycodes (6 bytes)
-        HID_RI_USAGE_PAGE(8, 0x07),    // Keyboard/Keypad
-        HID_RI_USAGE_MINIMUM(8, 0x00),
-        HID_RI_USAGE_MAXIMUM(8, 0xFF),
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00FF),
-        HID_RI_REPORT_SIZE(8, 0x08),
-        HID_RI_REPORT_COUNT(8, 0x06),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_ARRAY | HID_IOF_ABSOLUTE),
-
-        // Status LEDs (5 bits)
-        HID_RI_USAGE_PAGE(8, 0x08),    // LED
-        HID_RI_USAGE_MINIMUM(8, 0x01), // Num Lock
-        HID_RI_USAGE_MAXIMUM(8, 0x05), // Kana
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-        HID_RI_REPORT_SIZE(8, 0x01),
-        HID_RI_REPORT_COUNT(8, 0x05),
-        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE | HID_IOF_NON_VOLATILE),
-
-        // LED padding (3 bits)
-        HID_RI_REPORT_SIZE(8, 0x03),
-        HID_RI_REPORT_COUNT(8, 0x01),
-        HID_RI_OUTPUT(8, HID_IOF_CONSTANT),
+        KEYBOARD_REPORT_ITEMS
     HID_RI_END_COLLECTION(0),
     // clang-format on
 };
+#endif // !VIA_ENABLE
 
-#ifdef VIAL_RAW_ONLY
 // clang-format off
-const uint8_t hid_report_desc_extra[] = {
-    HID_RI_USAGE_PAGE(16, 0xff60),
-    HID_RI_USAGE(8, 0x61),
-    HID_RI_COLLECTION(8, 0x01),
-        HID_RI_USAGE(8, 0x62),
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
-        HID_RI_REPORT_SIZE(8, 8),
-        HID_RI_REPORT_COUNT(8, 32),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-    HID_RI_END_COLLECTION(0),
-};
-// clang-format on
-#else
-const uint8_t hid_report_desc_extra[] = {
-    // clang-format off
-    HID_RI_USAGE_PAGE(8, 0x01),           // Generic Desktop
-    HID_RI_USAGE(8, 0x80),                // System Control
-    HID_RI_COLLECTION(8, 0x01),           // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_SYSTEM),
-        HID_RI_USAGE_MINIMUM(8, 0x81),
-        HID_RI_USAGE_MAXIMUM(8, 0x83),
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(8, 0x01),
-        HID_RI_REPORT_SIZE(8, 1),
-        HID_RI_REPORT_COUNT(8, 3),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-        HID_RI_REPORT_COUNT(8, 5),
-        HID_RI_INPUT(8, HID_IOF_CONSTANT | HID_IOF_ARRAY | HID_IOF_ABSOLUTE),
-    HID_RI_END_COLLECTION(0),
-
-    HID_RI_USAGE_PAGE(8, 0x0c),           // Consumer
-    HID_RI_USAGE(8, 0x01),                // Consumer Control
-    HID_RI_COLLECTION(8, 0x01),           // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_CONSUMER),
-        HID_RI_USAGE_MINIMUM(8, 0x00), // TODO: revise ranges
-        HID_RI_USAGE_MAXIMUM(16, 0x023c), // TODO: revise ranges
-        HID_RI_LOGICAL_MINIMUM(8, 0x00), // TODO: revise ranges
-        HID_RI_LOGICAL_MAXIMUM(16, 0x023c), // TODO: revise ranges
-        HID_RI_REPORT_SIZE(8, 16),
-        HID_RI_REPORT_COUNT(8, 1),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_ARRAY | HID_IOF_ABSOLUTE),
+// The system and consumer reports' collections (report IDs 1 and 2).
+#define EXTRA_REPORT_COLLECTIONS \
+    HID_RI_USAGE_PAGE(8, 0x01),           /* Generic Desktop */ \
+    HID_RI_USAGE(8, 0x80),                /* System Control */ \
+    HID_RI_COLLECTION(8, 0x01),           /* Application */ \
+        HID_RI_REPORT_ID(8, REPORT_ID_SYSTEM), \
+        HID_RI_USAGE_MINIMUM(8, 0x81), \
+        HID_RI_USAGE_MAXIMUM(8, 0x83), \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(8, 0x01), \
+        HID_RI_REPORT_SIZE(8, 1), \
+        HID_RI_REPORT_COUNT(8, 3), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE), \
+        HID_RI_REPORT_COUNT(8, 5), \
+        HID_RI_INPUT(8, HID_IOF_CONSTANT | HID_IOF_ARRAY | HID_IOF_ABSOLUTE), \
+    HID_RI_END_COLLECTION(0), \
+ \
+    HID_RI_USAGE_PAGE(8, 0x0c),           /* Consumer */ \
+    HID_RI_USAGE(8, 0x01),                /* Consumer Control */ \
+    HID_RI_COLLECTION(8, 0x01),           /* Application */ \
+        HID_RI_REPORT_ID(8, REPORT_ID_CONSUMER), \
+        HID_RI_USAGE_MINIMUM(8, 0x00), /* TODO: revise ranges */ \
+        HID_RI_USAGE_MAXIMUM(16, CONSUMER_USAGE_MAX), /* TODO: revise ranges */ \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), /* TODO: revise ranges */ \
+        HID_RI_LOGICAL_MAXIMUM(16, CONSUMER_USAGE_MAX), /* TODO: revise ranges */ \
+        HID_RI_REPORT_SIZE(8, 16), \
+        HID_RI_REPORT_COUNT(8, 1), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_ARRAY | HID_IOF_ABSOLUTE), \
     HID_RI_END_COLLECTION(0),
 
 #ifdef ISP_ENABLE
-    HID_RI_USAGE_PAGE(16, 0xff00),        // Vendor
-    HID_RI_USAGE(8, 0x01),                // Vendor
-    HID_RI_COLLECTION(8, 0x01),           // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_ISP),
-        HID_RI_USAGE_MINIMUM(8, 0x01),
-        HID_RI_USAGE_MAXIMUM(8, 0x02),
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
-        HID_RI_REPORT_SIZE(8, 8),
-        HID_RI_REPORT_COUNT(8, 5),
-        HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+// The ISP command, feature report 5: sinowisp's way into the bootloader.
+#    define ISP_REPORT_COLLECTION \
+    HID_RI_USAGE_PAGE(16, 0xff00),        /* Vendor */ \
+    HID_RI_USAGE(8, 0x01),                /* Vendor */ \
+    HID_RI_COLLECTION(8, 0x01),           /* Application */ \
+        HID_RI_REPORT_ID(8, REPORT_ID_ISP), \
+        HID_RI_USAGE_MINIMUM(8, 0x01), \
+        HID_RI_USAGE_MAXIMUM(8, 0x02), \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff), \
+        HID_RI_REPORT_SIZE(8, 8), \
+        HID_RI_REPORT_COUNT(8, 5), \
+        HID_RI_FEATURE(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE), \
     HID_RI_END_COLLECTION(0),
+#else
+#    define ISP_REPORT_COLLECTION
 #endif
 
 #if DEBUG == 1
-    HID_RI_USAGE_PAGE(16, 0xff31),        // Vendor (console page)
-    HID_RI_USAGE(8, 0x74),                // Console
-    HID_RI_COLLECTION(8, 0x01),           // Application
-        HID_RI_REPORT_ID(8, REPORT_ID_CONSOLE),
-        HID_RI_USAGE(8, 0x75),            // Console data
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
-        HID_RI_REPORT_SIZE(8, 0x08),
-        HID_RI_REPORT_COUNT(8, CONSOLE_REPORT_SIZE),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+// The debug console (smk-console), input report 7.
+#    define CONSOLE_REPORT_COLLECTION \
+    HID_RI_USAGE_PAGE(16, 0xff31),        /* Vendor (console page) */ \
+    HID_RI_USAGE(8, 0x74),                /* Console */ \
+    HID_RI_COLLECTION(8, 0x01),           /* Application */ \
+        HID_RI_REPORT_ID(8, REPORT_ID_CONSOLE), \
+        HID_RI_USAGE(8, 0x75),            /* Console data */ \
+        HID_RI_LOGICAL_MINIMUM(8, 0x00), \
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff), \
+        HID_RI_REPORT_SIZE(8, 0x08), \
+        HID_RI_REPORT_COUNT(8, CONSOLE_REPORT_SIZE), \
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE), \
     HID_RI_END_COLLECTION(0),
-#endif // DEBUG
+#else
+#    define CONSOLE_REPORT_COLLECTION
+#endif
+// clang-format on
+
+#ifndef VIA_ENABLE
+const uint8_t hid_report_desc_extra[] = {
+    // clang-format off
+    EXTRA_REPORT_COLLECTIONS
+    ISP_REPORT_COLLECTION
+    CONSOLE_REPORT_COLLECTION
 
 #ifdef NKRO_ENABLE
     HID_RI_USAGE_PAGE(8, 0x01),           // Generic Desktop
@@ -204,47 +244,172 @@ const uint8_t hid_report_desc_extra[] = {
     HID_RI_END_COLLECTION(0),
 #endif // NKRO_ENABLE
 
-#ifdef VIAL_ENABLE
-    // Raw HID (Vial/VIA)
-    HID_RI_USAGE_PAGE(16, 0xff60),
-    HID_RI_USAGE(8, 0x61),
-    HID_RI_COLLECTION(8, 0x01),
-        HID_RI_REPORT_ID(8, REPORT_ID_RAW_HID),
-        HID_RI_USAGE(8, 0x62),
-        HID_RI_LOGICAL_MINIMUM(8, 0x00),
-        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
-        HID_RI_REPORT_SIZE(8, 8),
-        HID_RI_REPORT_COUNT(8, 32),
-        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
-    HID_RI_END_COLLECTION(0),
-#endif // VIAL_ENABLE
-
     // clang-format on
 };
-#endif // VIAL_RAW_ONLY
+#endif // !VIA_ENABLE
+
+#ifdef VIA_ENABLE
+// VIA: interface 0 is raw HID (usage page 0xFF60, usage 0x61; 32-byte reports
+// in and out without a report ID) on EP2 IN / OUT. Interface 1 carries the 6KRO keyboard (boot subclass) and the system,
+// consumer, ISP and console reports, each with its report ID, on EP1 IN; so
+// sinowisp still finds report 5 on interface 1. EP1 takes 16 bytes a packet,
+// too few for the NKRO report: no NKRO.
+const uint8_t hid_report_desc_raw[] = {
+    // clang-format off
+    HID_RI_USAGE_PAGE(16, 0xff60),        // Vendor (VIA)
+    HID_RI_USAGE(8, 0x61),
+    HID_RI_COLLECTION(8, 0x01),           // Application
+        HID_RI_USAGE(8, 0x62),            // Data to the host
+        HID_RI_LOGICAL_MINIMUM(8, 0x00),
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
+        HID_RI_REPORT_COUNT(8, VIA_REPORT_SIZE),
+        HID_RI_REPORT_SIZE(8, 0x08),
+        HID_RI_INPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE),
+
+        HID_RI_USAGE(8, 0x63),            // Data from the host
+        HID_RI_LOGICAL_MINIMUM(8, 0x00),
+        HID_RI_LOGICAL_MAXIMUM(16, 0x00ff),
+        HID_RI_REPORT_COUNT(8, VIA_REPORT_SIZE),
+        HID_RI_REPORT_SIZE(8, 0x08),
+        HID_RI_OUTPUT(8, HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE | HID_IOF_NON_VOLATILE),
+    HID_RI_END_COLLECTION(0),
+    // clang-format on
+};
+
+const uint8_t hid_report_desc_shared[] = {
+    // clang-format off
+    HID_RI_USAGE_PAGE(8, 0x01),           // Generic Desktop
+    HID_RI_USAGE(8, 0x06),                // Keyboard
+    HID_RI_COLLECTION(8, 0x01),           // Application
+        HID_RI_REPORT_ID(8, REPORT_ID_KEYBOARD),
+        KEYBOARD_REPORT_ITEMS
+    HID_RI_END_COLLECTION(0),
+
+    EXTRA_REPORT_COLLECTIONS
+    ISP_REPORT_COLLECTION
+    CONSOLE_REPORT_COLLECTION
+    // clang-format on
+};
+#endif // VIA_ENABLE
 
 usb_desc_device_c usb_desc_device = {
-    .bLength         = sizeof(struct usb_desc_device),
-    .bDescriptorType = USB_DESC_DEVICE,
-    .bcdUSB          = 0x0110,
-    .bDeviceClass    = USB_DEV_CLASS_PER_INTERFACE,
-    .bDeviceSubClass = USB_DEV_SUBCLASS_PER_INTERFACE,
-    .bDeviceProtocol = USB_DEV_PROTOCOL_PER_INTERFACE,
-    .bMaxPacketSize0 = 8,
-    .idVendor        = USB_VID,
-    .idProduct       = USB_PID,
-    .bcdDevice       = 0x0000,
-    .iManufacturer   = USB_STRING_MANUFACTURER,
-    .iProduct        = USB_STRING_PRODUCT,
-#ifdef USB_NO_SERIAL
-    .iSerialNumber = 0,
-#else
-    .iSerialNumber = USB_STRING_SERIAL_NUMBER,
-#endif
+    .bLength            = sizeof(struct usb_desc_device),
+    .bDescriptorType    = USB_DESC_DEVICE,
+    .bcdUSB             = 0x0110,
+    .bDeviceClass       = USB_DEV_CLASS_PER_INTERFACE,
+    .bDeviceSubClass    = USB_DEV_SUBCLASS_PER_INTERFACE,
+    .bDeviceProtocol    = USB_DEV_PROTOCOL_PER_INTERFACE,
+    .bMaxPacketSize0    = 8,
+    .idVendor           = USB_VID,
+    .idProduct          = USB_PID,
+    .bcdDevice          = 0x0000,
+    .iManufacturer      = USB_STRING_MANUFACTURER,
+    .iProduct           = USB_STRING_PRODUCT,
+    .iSerialNumber      = USB_SERIAL_STRING_INDEX,
     .bNumConfigurations = 1,
 };
 
+#ifdef VIA_ENABLE
+usb_desc_interface_c usb_desc_interface_raw = {
+    .bLength            = sizeof(struct usb_desc_interface),
+    .bDescriptorType    = USB_DESC_INTERFACE,
+    .bInterfaceNumber   = 0,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 2,
+    .bInterfaceClass    = USB_IFACE_CLASS_HID,
+    .bInterfaceSubClass = USB_IFACE_SUBCLASS_NONE,
+    .bInterfaceProtocol = USB_IFACE_PROTOCOL_BOOT,
+    .iInterface         = 0,
+};
+
+usb_desc_hid_c usb_desc_hid_raw = {
+    .bLength            = sizeof(struct usb_desc_hid),
+    .bDescriptorType    = USB_DESC_CLASS_HID,
+    .bcdHID             = BCDHID,
+    .bCountryCode       = 0,
+    .bNumDescriptors    = 1,
+    .bDescriptorType1   = USB_DESC_CLASS_REPORT,
+    .wDescriptorLength1 = sizeof(hid_report_desc_raw),
+};
+
+usb_desc_endpoint_c usb_desc_endpoint_raw_in = {
+    .bLength          = sizeof(struct usb_desc_endpoint),
+    .bDescriptorType  = USB_DESC_ENDPOINT,
+    .bEndpointAddress = 2 | USB_DIR_IN,
+    .bmAttributes     = USB_XFER_INTERRUPT,
+    .wMaxPacketSize   = VIA_REPORT_SIZE,
+    .bInterval        = 1, // 1ms
+};
+
+usb_desc_endpoint_c usb_desc_endpoint_raw_out = {
+    .bLength          = sizeof(struct usb_desc_endpoint),
+    .bDescriptorType  = USB_DESC_ENDPOINT,
+    .bEndpointAddress = 2 | USB_DIR_OUT,
+    .bmAttributes     = USB_XFER_INTERRUPT,
+    .wMaxPacketSize   = VIA_REPORT_SIZE,
+    .bInterval        = 1, // 1ms
+};
+
+usb_desc_interface_c usb_desc_interface_shared = {
+    .bLength            = sizeof(struct usb_desc_interface),
+    .bDescriptorType    = USB_DESC_INTERFACE,
+    .bInterfaceNumber   = 1,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 1,
+    .bInterfaceClass    = USB_IFACE_CLASS_HID,
+    .bInterfaceSubClass = USB_IFACE_SUBCLASS_HID_BOOT,
+    .bInterfaceProtocol = USB_IFACE_PROTOCOL_REPORT,
+    .iInterface         = 0,
+};
+
+usb_desc_hid_c usb_desc_hid_shared = {
+    .bLength            = sizeof(struct usb_desc_hid),
+    .bDescriptorType    = USB_DESC_CLASS_HID,
+    .bcdHID             = BCDHID,
+    .bCountryCode       = 0,
+    .bNumDescriptors    = 1,
+    .bDescriptorType1   = USB_DESC_CLASS_REPORT,
+    .wDescriptorLength1 = sizeof(hid_report_desc_shared),
+};
+
+usb_desc_endpoint_c usb_desc_endpoint_shared = {
+    .bLength          = sizeof(struct usb_desc_endpoint),
+    .bDescriptorType  = USB_DESC_ENDPOINT,
+    .bEndpointAddress = 1 | USB_DIR_IN,
+    .bmAttributes     = USB_XFER_INTERRUPT,
+    .wMaxPacketSize   = 16, // 16 bytes
+    .bInterval        = 1,  // 1ms
+};
+
+usb_configuration_c usb_config = {
+    {
+        .bLength             = sizeof(struct usb_desc_configuration),
+        .bDescriptorType     = USB_DESC_CONFIGURATION,
+        .bNumInterfaces      = 2,
+        .bConfigurationValue = 1,
+        .iConfiguration      = 0,
+        .bmAttributes        = USB_ATTR_RESERVED_1 | USB_ATTR_REMOTE_WAKEUP,
+        .bMaxPower           = 250, // 500mA
+    },
+    {
+        {.interface = &usb_desc_interface_raw},
+        {.hid = &usb_desc_hid_raw},
+        {.endpoint = &usb_desc_endpoint_raw_in},
+        {.endpoint = &usb_desc_endpoint_raw_out},
+        {.interface = &usb_desc_interface_shared},
+        {.hid = &usb_desc_hid_shared},
+        {.endpoint = &usb_desc_endpoint_shared},
+        {0},
+    },
+};
+
+// interface 0 and 1, by their report and HID descriptors
+#    define IFACE0_REPORT_DESC hid_report_desc_raw
+#    define IFACE1_REPORT_DESC hid_report_desc_shared
+#    define IFACE0_HID_DESC    usb_desc_hid_raw
+#    define IFACE1_HID_DESC    usb_desc_hid_shared
+#    define KEYBOARD_IFACE     1
+#else
 usb_desc_interface_c usb_desc_interface_main = {
     .bLength            = sizeof(struct usb_desc_interface),
     .bDescriptorType    = USB_DESC_INTERFACE,
@@ -277,15 +442,11 @@ usb_desc_endpoint_c usb_desc_endpoint_main = {
 };
 
 usb_desc_interface_c usb_desc_interface_extra = {
-    .bLength           = sizeof(struct usb_desc_interface),
-    .bDescriptorType   = USB_DESC_INTERFACE,
-    .bInterfaceNumber  = 1,
-    .bAlternateSetting = 0,
-#ifdef VIAL_ENABLE
-    .bNumEndpoints = 2,
-#else
-    .bNumEndpoints = 1,
-#endif
+    .bLength            = sizeof(struct usb_desc_interface),
+    .bDescriptorType    = USB_DESC_INTERFACE,
+    .bInterfaceNumber   = 1,
+    .bAlternateSetting  = 0,
+    .bNumEndpoints      = 1,
     .bInterfaceClass    = USB_IFACE_CLASS_HID,
     .bInterfaceSubClass = USB_IFACE_SUBCLASS_NONE,
     .bInterfaceProtocol = USB_IFACE_PROTOCOL_BOOT,
@@ -311,17 +472,6 @@ usb_desc_endpoint_c usb_desc_endpoint_extra = {
     .bInterval        = 1,  // 1ms
 };
 
-#ifdef VIAL_ENABLE
-usb_desc_endpoint_c usb_desc_endpoint_raw_out = {
-    .bLength          = sizeof(struct usb_desc_endpoint),
-    .bDescriptorType  = USB_DESC_ENDPOINT,
-    .bEndpointAddress = 2 | USB_DIR_OUT,
-    .bmAttributes     = USB_XFER_INTERRUPT,
-    .wMaxPacketSize   = 32,
-    .bInterval        = 1,
-};
-#endif
-
 usb_configuration_c usb_config = {
     {
         .bLength             = sizeof(struct usb_desc_configuration),
@@ -339,12 +489,16 @@ usb_configuration_c usb_config = {
         {.interface = &usb_desc_interface_extra},
         {.hid = &usb_desc_hid_extra},
         {.endpoint = &usb_desc_endpoint_extra},
-#ifdef VIAL_ENABLE
-        {.endpoint = &usb_desc_endpoint_raw_out},
-#endif
         {0},
     },
 };
+
+#    define IFACE0_REPORT_DESC hid_report_desc_keyboard
+#    define IFACE1_REPORT_DESC hid_report_desc_extra
+#    define IFACE0_HID_DESC    usb_desc_hid_main
+#    define IFACE1_HID_DESC    usb_desc_hid_extra
+#    define KEYBOARD_IFACE     0
+#endif // VIA_ENABLE
 
 usb_configuration_set_c usb_configs[] = {
     &usb_config,
@@ -398,6 +552,16 @@ static void usb_get_configuration_handler();
 static void usb_get_interface_handler();
 static void usb_hid_get_report_handler();
 static void usb_hid_set_report_handler(struct usb_req_setup *req);
+
+#if DEBUG == 1
+// SET_REPORT requests seen by the ISR, logged later from the main loop by usb_task().
+static volatile uint8_t  dbg_set_report_count;
+static volatile uint16_t dbg_set_report_value;
+static volatile uint16_t dbg_set_report_index;
+static volatile uint16_t dbg_set_report_length;
+static volatile uint8_t  dbg_led_count;
+static volatile uint8_t  dbg_led_value;
+#endif
 static void usb_hid_set_idle_handler(struct usb_req_setup *req);
 static void usb_hid_get_idle_handler();
 static void usb_hid_set_protocol_handler(struct usb_req_setup *req);
@@ -423,12 +587,23 @@ __bit        usb_suspended;
 #ifdef ISP_ENABLE
 static __bit usb_isp_requested;
 #endif
+#ifdef USB_WAKE_ON_KEY
+static __bit usb_wakeup_sent; // resume signalled in the current suspend
+#endif
 uint8_t         idle_time;
 usb_ep0_state_t usb_ep0_state;
-
-#ifdef VIAL_RAW_ONLY
-static uint8_t raw_hid_ep0_buf[32];
-static uint8_t raw_hid_ep0_len;
+#ifdef VIA_ENABLE
+// The keyboard interface's LED output report as SET_REPORT announced it: with
+// the report ID in front (report protocol) or the bare byte (boot protocol).
+static __bit usb_led_has_id;
+// A VIA report taken from EP2 OUT and not answered yet; EP2 OUT stays NAKing
+// until usb_task() has sent the answer.
+static __bit via_rx_ready;
+// usb_task() is answering via_buf: nothing else arms EP2 OUT meanwhile (a new
+// report would land in via_buf), usb_task() arms it when done.
+static __bit           via_busy;
+static __xdata uint8_t via_buf[VIA_REPORT_SIZE];
+static __xdata uint8_t kbd_report_buf[1 + KEYBOARD_REPORT_SIZE];
 #endif
 
 #define ENUM_QUIET_MS   500
@@ -440,15 +615,26 @@ static bool     enum_seen;
 
 void usb_init()
 {
+#ifdef USB_INIT_GATE
+    // A board that turns USB off (a wireless transport) keeps it off whatever
+    // the USB interrupt asks for: a bus reset or a pull-up event calls this too.
+    if (!kb_usb_allowed()) {
+        return;
+    }
+#endif
     usb_device_state     = USB_DEVICE_STATE_DEFAULT;
     received_usb_addr    = 0;
     active_configuration = 0;
     interface0_protocol  = 0;
     interface1_protocol  = 0;
-    usb_remote_wakeup    = 0;
-    usb_suspended        = 0;
-    usb_ep0_state        = USB_EP0_STATE_DEFAULT;
-    idle_time            = 0;
+#ifdef VIA_ENABLE
+    interface1_protocol = USB_PROTOCOL_REPORT; // the HID default after a reset
+    via_rx_ready        = 0;
+#endif
+    usb_remote_wakeup = 0;
+    usb_suspended     = 0;
+    usb_ep0_state     = USB_EP0_STATE_DEFAULT;
+    idle_time         = 0;
 
     ep0_xfer_bytes_left = 0;
     ep0_xfer_src        = 0;
@@ -474,6 +660,38 @@ void usb_deinit()
     usb_hw_deinit();
 }
 
+#ifdef VIA_ENABLE
+void usb_send_report(__xdata report_keyboard_t *report)
+{
+    if (!usb_is_configured()) {
+        return;
+    }
+    if (interface1_protocol == USB_PROTOCOL_BOOT) {
+        usb_hw_ep1_in_send(report->raw, KEYBOARD_REPORT_SIZE);
+        return;
+    }
+    kbd_report_buf[0] = REPORT_ID_KEYBOARD;
+    for (uint8_t i = 0; i < KEYBOARD_REPORT_SIZE; i++) {
+        kbd_report_buf[1 + i] = report->raw[i];
+    }
+    usb_hw_ep1_in_send(kbd_report_buf, 1 + KEYBOARD_REPORT_SIZE);
+}
+
+void usb_send_nkro(__xdata report_nkro_t *report)
+{
+    (void)report; // no NKRO report in the descriptor (see hid_report_desc_shared)
+}
+
+void usb_send_extra(__xdata report_extra_t *report)
+{
+    // under the boot protocol the host takes every EP1 report as the 8-byte
+    // keyboard report: no system or consumer reports then
+    if (!usb_is_configured() || interface1_protocol == USB_PROTOCOL_BOOT) {
+        return;
+    }
+    usb_hw_ep1_in_send(report->raw, EXTRA_REPORT_SIZE);
+}
+#else
 void usb_send_report(__xdata report_keyboard_t *report)
 {
     if (!usb_is_configured()) {
@@ -497,27 +715,6 @@ void usb_send_extra(__xdata report_extra_t *report)
     }
     usb_hw_ep2_in_send(report->raw, EXTRA_REPORT_SIZE);
 }
-
-#ifdef VIAL_ENABLE
-#    ifdef VIAL_RAW_ONLY
-void raw_hid_send(uint8_t *data, uint8_t length)
-{
-    (void)length;
-    usb_hw_ep2_in_send(data, 32);
-}
-#    else
-static uint8_t raw_hid_in_buf[33];
-
-void raw_hid_send(uint8_t *data, uint8_t length)
-{
-    (void)length;
-    raw_hid_in_buf[0] = REPORT_ID_RAW_HID;
-    for (uint8_t i = 0; i < 32; i++) {
-        raw_hid_in_buf[1 + i] = data[i];
-    }
-    usb_hw_ep2_in_send(raw_hid_in_buf, 33);
-}
-#    endif
 #endif
 
 void usb_wait_for_enumeration(void)
@@ -537,15 +734,62 @@ void usb_wait_for_enumeration(void)
     }
 }
 
+#ifdef USB_WAKE_ON_KEY
+// After a USB-suspend power-down: if a key woke it and the host has enabled
+// remote wakeup (SET/CLEAR_FEATURE), USBCON.WKUP is set once and never
+// cleared, leaving the resume signalling to the SIE.
+void usb_wake_host(void)
+{
+    if (usb_suspended && usb_remote_wakeup && !usb_wakeup_sent) {
+        usb_wakeup_sent = 1;
+        USBCON |= _WKUP;
+    }
+}
+#endif
+
 // not from the ISR: the bootloader never RETIs and reboots by jumping, so an in-service latch outlives it and kills USB.
 void usb_task(void)
 {
-#ifdef VIAL_ENABLE
-    raw_hid_task();
-#endif
 #ifdef ISP_ENABLE
     if (usb_isp_requested) {
+#    ifdef USB_ISP_PREPARE
+        usb_isp_prepare(); // the board parks what isp_jump() would leave running
+#    endif
         isp_jump();
+    }
+#endif
+#ifdef VIA_ENABLE
+    bool via_take;
+    __critical
+    {
+        via_take = via_rx_ready;
+        via_busy = via_take; // with the check: SET_CONFIGURATION in between would arm EP2 OUT
+    }
+    if (via_take) {
+        via_process(via_buf);
+        if (usb_is_configured()) {
+            usb_hw_ep2_in_send(via_buf, VIA_REPORT_SIZE);
+        }
+        __critical
+        {
+            via_rx_ready = 0;
+            via_busy     = 0;
+            if (usb_is_configured()) {
+                SET_EP2_OUT_RDY; // (also when a bus reset came meanwhile)
+            }
+        }
+    }
+#endif
+#if DEBUG == 1
+    static uint8_t set_report_logged;
+    static uint8_t led_logged;
+    if (set_report_logged != dbg_set_report_count) {
+        set_report_logged = dbg_set_report_count;
+        dprintf("SET_REPORT wValue=%04x wIndex=%04x wLength=%04x\r\n", dbg_set_report_value, dbg_set_report_index, dbg_set_report_length);
+    }
+    if (led_logged != dbg_led_count) {
+        led_logged = dbg_led_count;
+        dprintf("LED %02x\r\n", (unsigned int)dbg_led_value);
     }
 #endif
 }
@@ -553,7 +797,11 @@ void usb_task(void)
 #if DEBUG == 1
 bool usb_console_ready(void)
 {
+#    ifdef VIA_ENABLE
+    return usb_is_configured() && interface1_protocol != USB_PROTOCOL_BOOT && usb_hw_ep1_in_free();
+#    else
     return usb_is_configured() && usb_hw_ep2_in_free();
+#    endif
 }
 
 void usb_console_send(const __xdata uint8_t *data, uint8_t len)
@@ -564,7 +812,11 @@ void usb_console_send(const __xdata uint8_t *data, uint8_t len)
 
 uint8_t usb_device_state_get_protocol()
 {
+#ifdef VIA_ENABLE
+    return interface1_protocol;
+#else
     return interface0_protocol;
+#endif
 }
 
 bool usb_is_configured(void)
@@ -773,10 +1025,16 @@ void usb_irq_dispatch(void)
                 usb_setup_irq();
             } else if (temp_usbif1 & _RESMIF) { // RESMIF
                 USBIF1 &= ~_RESMIF;
+#ifdef USB_WAKE_ON_KEY
+                usb_wakeup_sent = 1; // the host is resuming the bus: no remote wakeup now
+#endif
             } else if (temp_usbif1 & _SUSPIF) { // SUSPIF
                 USBIF1 &= ~_SUSPIF;
                 if (usb_device_state == USB_DEVICE_STATE_CONFIGURED) {
                     usb_suspended = 1;
+#ifdef USB_WAKE_ON_KEY
+                    usb_wakeup_sent = 0;
+#endif
                 }
             } else if (temp_usbif1 & _USBRSTIF) { // BUSRSTIF
                 USBIF1 &= ~_USBRSTIF;
@@ -797,20 +1055,18 @@ void usb_irq_dispatch(void)
     } else if (temp_usbif2 != 0x00) {
         if (temp_usbif2 & _OEP2IF) {
             USBIF2 &= ~_OEP2IF;
-#ifdef VIAL_ENABLE
-#    ifdef VIAL_RAW_ONLY
-            raw_hid_receive(EP2_OUT_BUF, 32);
-#    else
-            uint8_t  length  = OEP2CNT;
-            uint8_t *payload = EP2_OUT_BUF;
-            if (length == 33 && payload[0] == REPORT_ID_RAW_HID) {
-                payload++;
-                length = 32;
+#ifdef VIA_ENABLE
+            // a VIA report: kept for usb_task(), which answers and re-arms
+            {
+                const uint8_t n = OEP2CNT;
+                for (uint8_t i = 0; i < VIA_REPORT_SIZE; i++) {
+                    via_buf[i] = (i < n) ? EP2_OUT_BUF[i] : 0;
+                }
+                via_rx_ready = 1;
             }
-            raw_hid_receive(payload, length);
-#    endif
-#endif
+#else
             SET_EP2_OUT_RDY;
+#endif
         } else if (temp_usbif2 & _OEP1IF) {
             USBIF2 &= ~_OEP1IF;
         } else if (temp_usbif2 & _OEP0IF) {
@@ -890,6 +1146,10 @@ static void usb_clear_endpoint_halt_handler(struct usb_req_setup *req)
                 CANCEL_EP1_IN_STALL;
             } else if (req->wIndex == 0x82) {
                 CANCEL_EP2_IN_STALL;
+#ifdef VIA_ENABLE
+            } else if (req->wIndex == 0x02) {
+                CANCEL_EP2_OUT_STALL;
+#endif
             } else {
                 STALL_EP0();
                 return;
@@ -910,6 +1170,10 @@ static void usb_set_endpoint_halt_handler(struct usb_req_setup *req)
             SET_EP1_IN_STALL;
         } else if (req->wIndex == 0x82) {
             SET_EP2_IN_STALL;
+#ifdef VIA_ENABLE
+        } else if (req->wIndex == 0x02) {
+            SET_EP2_OUT_STALL;
+#endif
         } else {
             STALL_EP0();
         }
@@ -933,16 +1197,14 @@ static void usb_set_configuration_handler(struct usb_req_setup *req)
 
             if (active_configuration != 0) {
                 usb_device_state = USB_DEVICE_STATE_CONFIGURED;
-#ifdef VIAL_ENABLE
-                USBIF2 &= ~_OEP2IF;
-                USBIE2 |= _OEP2IE;
-                SET_EP2_OUT_RDY;
+#ifdef VIA_ENABLE
+                if (!via_busy) {
+                    via_rx_ready = 0;
+                    SET_EP2_OUT_RDY; // ready for VIA's first report
+                }
 #endif
             } else {
                 usb_device_state = USB_DEVICE_STATE_ADDRESSED;
-#ifdef VIAL_ENABLE
-                USBIE2 &= ~_OEP2IE;
-#endif
             }
 
             CLEAR_EP0_CNT;
@@ -968,13 +1230,6 @@ static void usb_set_interface_handler(struct usb_req_setup *req)
             SET_EP0_IN_RDY;
             SET_EP0_OUT_STALL;
         } else if (req->wIndex == 1) {
-#ifdef VIAL_ENABLE
-            if (active_configuration) {
-                USBIF2 &= ~_OEP2IF;
-                USBIE2 |= _OEP2IE;
-                SET_EP2_OUT_RDY;
-            }
-#endif
             CLEAR_EP0_CNT;
             SET_EP0_IN_RDY;
             SET_EP0_OUT_STALL;
@@ -1040,6 +1295,11 @@ static void usb_get_endpoint_status_handler(struct usb_req_setup *req)
         } else if (req->wIndex == 0x82) {
             EP0_IN_BUF[0] = ((EP2CON & 0x08)) >> 3;
             EP0_IN_BUF[1] = 0;
+#ifdef VIA_ENABLE
+        } else if (req->wIndex == 0x02) {
+            EP0_IN_BUF[0] = ((EP2CON & _OEP2STL)) >> 1;
+            EP0_IN_BUF[1] = 0;
+#endif
         } else {
             STALL_EP0();
             return;
@@ -1118,11 +1378,11 @@ static void usb_get_descriptor_handler(struct usb_req_setup *req)
         uint8_t iface_index = req->wIndex;
 
         if (iface_index == 0) {
-            addr   = (uint8_t *)hid_report_desc_keyboard;
-            length = sizeof(hid_report_desc_keyboard);
+            addr   = (uint8_t *)IFACE0_REPORT_DESC;
+            length = sizeof(IFACE0_REPORT_DESC);
         } else if (iface_index == 1) {
-            addr   = (uint8_t *)hid_report_desc_extra;
-            length = sizeof(hid_report_desc_extra);
+            addr   = (uint8_t *)IFACE1_REPORT_DESC;
+            length = sizeof(IFACE1_REPORT_DESC);
         } else {
             STALL_EP0();
             return;
@@ -1131,12 +1391,12 @@ static void usb_get_descriptor_handler(struct usb_req_setup *req)
         uint8_t iface_index = req->wIndex;
 
         if (iface_index == 0) {
-            APPEND_DESC(&usb_desc_hid_main);
+            APPEND_DESC(&IFACE0_HID_DESC);
 
             addr   = scratch;
             length = scratch[0];
         } else if (iface_index == 1) {
-            APPEND_DESC(&usb_desc_hid_extra);
+            APPEND_DESC(&IFACE1_HID_DESC);
 
             addr   = scratch;
             length = scratch[0];
@@ -1185,16 +1445,24 @@ static void usb_hid_get_report_handler()
 
 static void usb_hid_set_report_handler(struct usb_req_setup *req)
 {
+#if DEBUG == 1
+    dbg_set_report_value  = req->wValue;
+    dbg_set_report_index  = req->wIndex;
+    dbg_set_report_length = req->wLength;
+    dbg_set_report_count++;
+#endif
     switch (req->wValue >> 8) {
         case REPORT_TYPE_OUTPUT:
-            if ((req->wIndex == 0) && (req->wLength == 0x0001)) {
-                usb_ep0_state = USB_EP0_STATE_LED;
+#ifdef VIA_ENABLE
+            // the LED report of interface 1: with its ID (report protocol) or bare
+            if (req->wIndex == KEYBOARD_IFACE && (req->wLength == 0x0001 || req->wLength == 0x0002)) {
+                usb_led_has_id = (req->wLength == 0x0002);
+                usb_ep0_state  = USB_EP0_STATE_LED;
                 SET_EP0_OUT_RDY;
             }
-#ifdef VIAL_RAW_ONLY
-            else if ((req->wIndex == 1) && (req->wValue == 0x0200) && (req->wLength == 32)) {
-                raw_hid_ep0_len = 0;
-                usb_ep0_state   = USB_EP0_STATE_RAW_HID;
+#else
+            if ((req->wIndex == 0) && (req->wLength == 0x0001)) {
+                usb_ep0_state = USB_EP0_STATE_LED;
                 SET_EP0_OUT_RDY;
             }
 #endif
@@ -1204,6 +1472,9 @@ static void usb_hid_set_report_handler(struct usb_req_setup *req)
         case REPORT_TYPE_FEATURE: {
             uint8_t report_id = (uint8_t)(req->wValue & 0xff);
             (void)report_id;
+#ifdef USB_FEATURE_REPORT_STRICT
+            usb_ep0_state = USB_EP0_STATE_DEFAULT; // set below if this ID is taken
+#endif
 #ifdef ISP_ENABLE
             if (report_id == REPORT_ID_ISP) {
                 usb_ep0_state = USB_EP0_STATE_ISP;
@@ -1214,6 +1485,13 @@ static void usb_hid_set_report_handler(struct usb_req_setup *req)
             if (report_id == REPORT_ID_CONSOLE) {
                 usb_ep0_state = USB_EP0_STATE_CONSOLE;
                 SET_EP0_OUT_RDY;
+            }
+#endif
+#ifdef USB_FEATURE_REPORT_STRICT
+            // Any other feature report ID is refused, so the host gets an
+            // error instead of waiting for a data stage nobody accepts.
+            if (usb_ep0_state == USB_EP0_STATE_DEFAULT) {
+                STALL_EP0();
             }
 #endif
 
@@ -1272,7 +1550,19 @@ void usb_ep0_out_irq()
     if (usb_ep0_state == USB_EP0_STATE_LED) {
         usb_ep0_state = 0;
 
-        keyboard_set_led_state(EP0_OUT_BUF[0]);
+#ifdef VIA_ENABLE
+        const uint8_t led = usb_led_has_id ? EP0_OUT_BUF[1] : EP0_OUT_BUF[0];
+        if (!usb_led_has_id || EP0_OUT_BUF[0] == REPORT_ID_KEYBOARD) {
+            keyboard_set_led_state(led);
+        }
+#else
+        const uint8_t led = EP0_OUT_BUF[0];
+        keyboard_set_led_state(led);
+#endif
+#if DEBUG == 1
+        dbg_led_value = led;
+        dbg_led_count++;
+#endif
 
         CLEAR_EP0_CNT;
         SET_EP0_IN_RDY;
@@ -1283,6 +1573,13 @@ void usb_ep0_out_irq()
         if (EP0_OUT_BUF[0] == 0x05 && EP0_OUT_BUF[1] == 0x75) {
             usb_isp_requested = 1;
         }
+#    ifdef USB_FEATURE_REPORT_STRICT
+        else {
+            // report 5 without the ISP command: acknowledge it and do nothing
+            CLEAR_EP0_CNT;
+            SET_EP0_IN_RDY;
+        }
+#    endif
 #endif
 #if DEBUG == 1
     } else if (usb_ep0_state == USB_EP0_STATE_CONSOLE) {
@@ -1292,20 +1589,6 @@ void usb_ep0_out_irq()
 
         CLEAR_EP0_CNT;
         SET_EP0_IN_RDY;
-#endif
-#ifdef VIAL_RAW_ONLY
-    } else if (usb_ep0_state == USB_EP0_STATE_RAW_HID) {
-        for (uint8_t i = 0; i < EP0_BUF_SIZE; i++) {
-            raw_hid_ep0_buf[raw_hid_ep0_len + i] = EP0_OUT_BUF[i];
-        }
-        raw_hid_ep0_len = (uint8_t)(raw_hid_ep0_len + EP0_BUF_SIZE);
-
-        if (raw_hid_ep0_len >= 32) {
-            usb_ep0_state = 0;
-            raw_hid_receive(raw_hid_ep0_buf, 32);
-            CLEAR_EP0_CNT;
-            SET_EP0_IN_RDY;
-        }
 #endif
     } else {
         usb_ep0_state = 0;

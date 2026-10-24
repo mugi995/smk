@@ -47,7 +47,7 @@ static uint16_t resolve_keycode(uint16_t base, uint8_t row, uint8_t col)
         return base;
     }
 
-    const uint16_t overlay = keymaps[action_layer][row][col];
+    const uint16_t overlay = KEYMAP_KEYCODE(action_layer, row, col);
     return (overlay == KC_TRANSPARENT) ? base : overlay;
 }
 
@@ -86,7 +86,7 @@ static void send_keycode(uint16_t qcode, bool pressed)
 
 static void process_key_state(uint8_t row, uint8_t col, bool pressed)
 {
-    const uint16_t base = keymaps[default_layer][row][col];
+    const uint16_t base = KEYMAP_KEYCODE(default_layer, row, col);
 
     if (IS_QK_MOMENTARY(base)) {
         if (pressed) {
@@ -141,6 +141,20 @@ void matrix_scan_full(void)
 
     matrix_updated = true;
 }
+
+#ifdef VIA_ENABLE
+uint16_t matrix_get_row(uint8_t row)
+{
+    const matrix_col_t mask  = (matrix_col_t)(1u << row);
+    uint16_t           value = 0;
+    for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+        if (matrix[col] & mask) {
+            value |= (uint16_t)1u << col;
+        }
+    }
+    return value;
+}
+#endif
 
 uint8_t matrix_task()
 {

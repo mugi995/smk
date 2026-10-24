@@ -6,6 +6,9 @@
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 15
 
+// The layers of keymaps[] (layouts/default/layout.c): VIA edits this many.
+#define DYNAMIC_KEYMAP_LAYER_COUNT 2
+
 enum custom_keycodes {
     KB_BRI_UP = SAFE_RANGE,
     KB_BRI_DN,

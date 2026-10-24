@@ -7,6 +7,11 @@
 void usb_hw_init(void);
 void usb_hw_deinit(void);
 
+#ifdef USB_IRQ_ACTIVITY
+// Set by every USB interrupt; a board clears it when it has seen it.
+extern volatile __bit usb_irq_activity;
+#endif
+
 void usb_hw_ep1_in_send(uint8_t *src, uint8_t len);
 void usb_hw_ep2_in_send(uint8_t *src, uint8_t len);
 
@@ -14,7 +19,11 @@ void usb_hw_ep1_in_complete(void);
 void usb_hw_ep2_in_complete(void);
 
 #if DEBUG == 1
+#    ifdef VIA_ENABLE
+bool usb_hw_ep1_in_free(void);
+#    else
 bool usb_hw_ep2_in_free(void);
+#    endif
 void usb_hw_console_send(const __xdata uint8_t *data, uint8_t len);
 #endif
 
