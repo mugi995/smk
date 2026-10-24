@@ -9,6 +9,7 @@ keyboards += {
             'user_init.c',
             'user_sleep.c',
             'kb.c',
+            'vial.c',
         ),
         'layouts' : {
             'default' : {
@@ -21,6 +22,14 @@ keyboards += {
                 'dir' : kb_dir / 'layouts/default',
                 'src' : files('layouts/default/layout.c'),
                 'via' : true,
+            },
+            # Vial: the same raw HID and dynamic keymap, plus the 0xFE commands
+            # (UID, XZ definition, unlock) served from vial_definition.h.
+            'default-vial' : {
+                'dir' : kb_dir / 'layouts/default',
+                'src' : files('layouts/default/layout.c'),
+                'via' : true,
+                'vial' : true,
             },
         },
         'options' : {

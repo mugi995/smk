@@ -8,6 +8,9 @@
 #include "matrix.h"
 #include "tick.h"
 #include "kbdef.h"
+#ifdef VIAL_ENABLE
+#    include "vial.h"
+#endif
 #include <stdint.h>
 
 enum via_command_id {
@@ -167,6 +170,12 @@ void via_process(__xdata uint8_t *data)
             dynamic_keymap_set_buffer(offset, size, &command_data[3]);
             break;
         }
+
+#ifdef VIAL_ENABLE
+        case 0xFE:
+            vial_process(data);
+            break;
+#endif
 
         default:
             data[0] = id_unhandled;
