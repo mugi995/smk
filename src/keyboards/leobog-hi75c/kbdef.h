@@ -9,6 +9,10 @@
 // Uniform RGB driver (rgb.c): Vial/VIA solid colour and brightness.
 #define RGB_ENABLE 1
 
+// The key rows are sampled from the LED COM interrupt (led_scan_isr) instead of
+// matrix_scan_full(); see tick.c.
+#define MATRIX_SCAN_IN_LED_ISR 1
+
 // The layers of keymaps[] (layouts/default/layout.c): VIA edits this many.
 #define DYNAMIC_KEYMAP_LAYER_COUNT 2
 

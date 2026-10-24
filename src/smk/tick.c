@@ -39,6 +39,9 @@ uint16_t tick_scans(void)
 static void run_matrix_scan(void)
 {
     systick_arm(SYSTICK_SLOT_MATRIX_SCAN);
+#ifndef MATRIX_SCAN_IN_LED_ISR
+    matrix_scan_full();
+#endif
     scans++;
 }
 
