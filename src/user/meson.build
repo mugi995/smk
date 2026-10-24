@@ -2,6 +2,7 @@ inc_base += meson.current_source_dir()
 
 src_user += files(
     'user_init.c',
+    'raw_hid.c',
     'layout_process_record.c',
     'indicators_start.c',
     'indicators_pre_update.c',

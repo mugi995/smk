@@ -52,7 +52,11 @@ void usb_hw_init(void)
     USBADDR = 0;
     USBIE1  = (_OVERIE | _SETUPIE | _SOFIA | _RESMIE | _SUSPIE | _PBRSTIE);
     USBIE2  = (_OEP0IE | _IEP0IE);
-    USBCON  = (_ENUSB | _SW1CON);
+#ifdef USB_SW2CON
+    USBCON = (_ENUSB | _SW1CON | _SW2CON);
+#else
+    USBCON = (_ENUSB | _SW1CON);
+#endif
     IEN1 |= _EUSB;
 }
 

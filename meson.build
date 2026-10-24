@@ -156,6 +156,29 @@ foreach keyboard, board : keyboards
             '-DLAYOUT_NAME="@0@"'.format(layout),
         ]
 
+        if options.get('no_serial', '') == '1'
+            cc_args += '-DUSB_NO_SERIAL=1'
+        endif
+
+        if options.get('usb_sw2con', '') == '1'
+            cc_args += '-DUSB_SW2CON=1'
+        endif
+
+        if options.get('led_com_isr', '') == '1'
+            cc_args += '-DLED_COM_ISR=1'
+        endif
+
+        if options.get('led_gpio_test', '') == '1'
+            cc_args += '-DLED_GPIO_TEST=1'
+        endif
+
+        if options.get('vial', '') == '1' and not get_option('nkro').enabled()
+            cc_args += '-DVIAL_ENABLE=1'
+            if options.get('vial_raw_only', '') == '1'
+                cc_args += '-DVIAL_RAW_ONLY=1'
+            endif
+        endif
+
         foreach key, define : usb_string_defines
             value = get_option('usb_' + key)
             if value == ''
