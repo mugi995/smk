@@ -6,37 +6,15 @@
 #include "matrix.h"
 #include "pwm.h"
 #include "report.h"
+#include "rgb.h"
 #include "settings.h"
 #include "usb.h"
 #include "user_matrix.h"
 #include <stdbool.h>
 
-static uint8_t  enc_prev;
-static int8_t   enc_acc;
-static uint16_t led_brightness = 512;
-static uint8_t  led_col;
-
-static void led_apply_brightness(void)
-{
-    SET_PWM_DUTY(PWM20, 0, led_brightness);
-    SET_PWM_DUTY(PWM21, 0, led_brightness);
-    SET_PWM_DUTY(PWM22, 0, led_brightness);
-    SET_PWM_DUTY(PWM23, 0, led_brightness);
-    SET_PWM_DUTY(PWM24, 0, led_brightness);
-    SET_PWM_DUTY(PWM25, 0, led_brightness);
-    SET_PWM_DUTY(PWM10, 0, led_brightness);
-    SET_PWM_DUTY(PWM11, 0, led_brightness);
-    SET_PWM_DUTY(PWM12, 0, led_brightness);
-    SET_PWM_DUTY(PWM13, 0, led_brightness);
-    SET_PWM_DUTY(PWM14, 0, led_brightness);
-    SET_PWM_DUTY(PWM15, 0, led_brightness);
-    SET_PWM_DUTY(PWM03, 0, led_brightness);
-    SET_PWM_DUTY(PWM04, 0, led_brightness);
-    SET_PWM_DUTY(PWM05, 0, led_brightness);
-    SET_PWM_DUTY(PWM00, 0, led_brightness);
-    SET_PWM_DUTY(PWM01, 0, led_brightness);
-    SET_PWM_DUTY(PWM02, 0, led_brightness);
-}
+static uint8_t enc_prev;
+static int8_t  enc_acc;
+static uint8_t led_col;
 
 static void led_pwm_init(void)
 {
@@ -80,8 +58,6 @@ static void led_pwm_init(void)
     PWM10CON = 0x89;
     PWM20CON = 0x89;
 
-    led_apply_brightness();
-
     PWM00CON |= 0x40; // PWM0IE
     IEN1 |= _EPWM0;
 #endif
@@ -106,6 +82,7 @@ void kb_init(void)
     enc_prev = (uint8_t)((P0 >> 5) & 0x03);
     enc_acc  = 0;
     led_pwm_init();
+    rgb_init();
 }
 
 // dir 0 = CCW / VOL_DOWN, dir 1 = CW / VOL_UP.
@@ -146,15 +123,13 @@ bool kb_process_record(uint16_t keycode, bool key_pressed)
 {
     switch (keycode) {
         case KB_BRI_UP:
-            if (key_pressed && led_brightness <= 1020 - 128) {
-                led_brightness += 128;
-                led_apply_brightness();
+            if (key_pressed) {
+                rgb_brightness_step(16);
             }
             return false;
         case KB_BRI_DN:
-            if (key_pressed && led_brightness >= 128) {
-                led_brightness -= 128;
-                led_apply_brightness();
+            if (key_pressed) {
+                rgb_brightness_step(-16);
             }
             return false;
         default:

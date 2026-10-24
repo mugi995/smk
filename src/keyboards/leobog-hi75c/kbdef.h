@@ -6,6 +6,9 @@
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 15
 
+// Uniform RGB driver (rgb.c): Vial/VIA solid colour and brightness.
+#define RGB_ENABLE 1
+
 // The layers of keymaps[] (layouts/default/layout.c): VIA edits this many.
 #define DYNAMIC_KEYMAP_LAYER_COUNT 2
 

@@ -7,12 +7,14 @@
 _Static_assert(sizeof(user_settings_t) <= NVM_CAPACITY, "user_settings_t too large for the settings record");
 
 user_settings_t user_settings;
+bool            settings_loaded;
 
 static bool settings_dirty;
 
 bool settings_load(void)
 {
-    return nvm_load((__xdata uint8_t *)&user_settings, (uint8_t)sizeof(user_settings));
+    settings_loaded = nvm_load((__xdata uint8_t *)&user_settings, (uint8_t)sizeof(user_settings));
+    return settings_loaded;
 }
 
 #if DEBUG == 1

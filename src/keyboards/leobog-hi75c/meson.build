@@ -9,6 +9,7 @@ keyboards += {
             'user_init.c',
             'user_sleep.c',
             'kb.c',
+            'rgb.c',
             'vial.c',
         ),
         'layouts' : {
