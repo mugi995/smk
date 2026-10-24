@@ -282,11 +282,21 @@ void rgb_vial_set(__xdata uint8_t *data)
     }
 
     const uint16_t mode = (uint16_t)(data[2] | ((uint16_t)data[3] << 8));
+    const uint8_t  m    = (mode == 0) ? 0 : 2;
+    const uint8_t  h    = data[5];
+    const uint8_t  s    = data[6];
+    const uint8_t  v    = (data[7] > RGB_MAX_VAL) ? RGB_MAX_VAL : data[7];
 
-    user_settings.rgb_mode = (mode == 0) ? 0 : 2;
-    user_settings.rgb_hue  = data[5];
-    user_settings.rgb_sat  = data[6];
-    user_settings.rgb_val  = (data[7] > RGB_MAX_VAL) ? RGB_MAX_VAL : data[7];
+    // The RGB panel can re-send the same values; rewriting the 18 PWM duties
+    // then shows up as flicker.
+    if (user_settings.rgb_mode == m && user_settings.rgb_hue == h && user_settings.rgb_sat == s && user_settings.rgb_val == v) {
+        return;
+    }
+
+    user_settings.rgb_mode = m;
+    user_settings.rgb_hue  = h;
+    user_settings.rgb_sat  = s;
+    user_settings.rgb_val  = v;
 
     rgb_apply();
 }
@@ -316,20 +326,30 @@ void rgb_via_get(__xdata uint8_t *data)
 void rgb_via_set(__xdata uint8_t *data)
 {
     switch (data[2]) {
-        case 1:
-            user_settings.rgb_val = (uint8_t)(((uint16_t)data[3] * RGB_MAX_VAL) / 255u);
-            rgb_apply();
+        case 1: {
+            const uint8_t v = (uint8_t)(((uint16_t)data[3] * RGB_MAX_VAL) / 255u);
+            if (user_settings.rgb_val != v) {
+                user_settings.rgb_val = v;
+                rgb_apply();
+            }
             break;
-        case 2:
-            user_settings.rgb_mode = (data[3] == 0) ? 0 : 2;
-            rgb_apply();
+        }
+        case 2: {
+            const uint8_t m = (data[3] == 0) ? 0 : 2;
+            if (user_settings.rgb_mode != m) {
+                user_settings.rgb_mode = m;
+                rgb_apply();
+            }
             break;
+        }
         case 3:
             break;
         case 4:
-            user_settings.rgb_hue = data[3];
-            user_settings.rgb_sat = data[4];
-            rgb_apply();
+            if (user_settings.rgb_hue != data[3] || user_settings.rgb_sat != data[4]) {
+                user_settings.rgb_hue = data[3];
+                user_settings.rgb_sat = data[4];
+                rgb_apply();
+            }
             break;
         default:
             break;
