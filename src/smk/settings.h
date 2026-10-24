@@ -13,6 +13,8 @@ typedef struct {
     uint8_t ul_speed;
     uint8_t battery_indicator_on;
     uint8_t rf_link;
+    // Encoder keycodes: [layer][direction], 0 = the board default.
+    uint16_t encoder[2][2];
 } user_settings_t;
 
 extern user_settings_t user_settings;

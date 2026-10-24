@@ -8,6 +8,8 @@
 // committed as vial_definition.h, so the 8051 only serves bytes.
 
 #include "vial.h"
+#include "keycodes.h"
+#include "settings.h"
 
 #ifdef VIAL_ENABLE
 
@@ -59,6 +61,45 @@ void vial_process(__xdata uint8_t *data)
             for (uint8_t i = 0; i < VIAL_REPORT_SIZE; i++) {
                 const uint32_t index = offset + i;
                 data[i]              = (index < sizeof(keyboard_definition)) ? keyboard_definition[index] : 0;
+            }
+            break;
+        }
+
+        // Encoder keycodes: layer at data[2], index at data[3].
+        // Response: direction 0 (CCW) at data[0..1], direction 1 (CW) at data[2..3],
+        // both big endian. Stored value 0 means the board default.
+        case 0x03: {
+            const uint8_t layer = (uint8_t)(data[2] & 0x01);
+            const uint8_t index = data[3];
+            uint16_t      ccw   = KC_AUDIO_VOL_DOWN;
+            uint16_t      cw    = KC_AUDIO_VOL_UP;
+            if (index == 0) {
+                if (user_settings.encoder[layer][0]) {
+                    ccw = user_settings.encoder[layer][0];
+                }
+                if (user_settings.encoder[layer][1]) {
+                    cw = user_settings.encoder[layer][1];
+                }
+                data[0] = (uint8_t)(ccw >> 8);
+                data[1] = (uint8_t)ccw;
+                data[2] = (uint8_t)(cw >> 8);
+                data[3] = (uint8_t)cw;
+            } else {
+                zero_report(data);
+            }
+            break;
+        }
+
+        // Set encoder keycode: layer data[2], index data[3], direction data[4],
+        // keycode data[5..6] big endian.
+        case 0x04: {
+            const uint8_t  layer = data[2];
+            const uint8_t  index = data[3];
+            const uint8_t  dir   = data[4];
+            const uint16_t code  = (uint16_t)(((uint16_t)data[5] << 8) | data[6]);
+            if (index == 0 && layer < 2 && dir < 2) {
+                user_settings.encoder[layer][dir] = code;
+                settings_mark_dirty();
             }
             break;
         }

@@ -84,6 +84,24 @@ static void send_keycode(uint16_t qcode, bool pressed)
     }
 }
 
+uint8_t matrix_active_layer(void)
+{
+    return action_layer;
+}
+
+void matrix_tap_keycode(uint16_t qcode)
+{
+    if (!kb_process_record(qcode, true)) {
+        return;
+    }
+    send_keycode(qcode, true);
+    delay_ms(10);
+    if (!kb_process_record(qcode, false)) {
+        return;
+    }
+    send_keycode(qcode, false);
+}
+
 static void process_key_state(uint8_t row, uint8_t col, bool pressed)
 {
     const uint16_t base = KEYMAP_KEYCODE(default_layer, row, col);

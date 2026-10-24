@@ -3,8 +3,10 @@
 #include "gpio.h"
 #include "host.h"
 #include "keycodes.h"
+#include "matrix.h"
 #include "pwm.h"
 #include "report.h"
+#include "settings.h"
 #include "usb.h"
 #include "user_matrix.h"
 #include <stdbool.h>
@@ -106,11 +108,20 @@ void kb_init(void)
     led_pwm_init();
 }
 
-static void enc_step(uint16_t keycode)
+// dir 0 = CCW / VOL_DOWN, dir 1 = CW / VOL_UP.
+static void enc_step(uint8_t dir)
 {
-    host_consumer_send(keycode_to_consumer((uint8_t)keycode));
-    delay_ms(10);
-    host_consumer_send(0);
+    uint8_t layer = matrix_active_layer();
+    if (layer >= 2) {
+        layer = 1;
+    }
+
+    uint16_t code = user_settings.encoder[layer][dir];
+    if (!code) {
+        code = (dir == 0) ? KC_AUDIO_VOL_DOWN : KC_AUDIO_VOL_UP;
+    }
+
+    matrix_tap_keycode(code);
 }
 
 void kb_update(void)
@@ -124,10 +135,10 @@ void kb_update(void)
 
     if (enc_acc >= 4) {
         enc_acc = 0;
-        enc_step(KC_AUDIO_VOL_UP);
+        enc_step(1);
     } else if (enc_acc <= -4) {
         enc_acc = 0;
-        enc_step(KC_AUDIO_VOL_DOWN);
+        enc_step(0);
     }
 }
 
