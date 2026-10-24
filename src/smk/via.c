@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // VIA's raw HID commands, after QMK's quantum/via.c (raw_hid_receive),
-// Copyright 2019 Jason Williams (Wilba). Only the keymap is kept: no macros,
-// no custom values (lighting menus), no encoders.
+// Copyright 2019 Jason Williams (Wilba). Only the keymap and the uniform RGB
+// solid colour are kept: no macros and no encoders.
 
 #include "via.h"
 #include "dynamic_keymap.h"
 #include "matrix.h"
 #include "tick.h"
 #include "kbdef.h"
+#ifdef RGB_ENABLE
+#    include "rgb.h"
+#endif
 #ifdef VIAL_ENABLE
 #    include "vial.h"
 #endif
@@ -170,6 +173,30 @@ void via_process(__xdata uint8_t *data)
             dynamic_keymap_set_buffer(offset, size, &command_data[3]);
             break;
         }
+
+#ifdef RGB_ENABLE
+        // Lighting: VialRGB subcommands (0x40..0x44) or VIA qmk_rgblight
+        // (channel 2, value IDs 1..4). Both drive the same uniform colour.
+        case 0x07:
+            if (command_data[0] >= 0x40) {
+                rgb_vial_set(data);
+            } else if (command_data[0] == 2) {
+                rgb_via_set(data);
+            }
+            break;
+
+        case 0x08:
+            if (command_data[0] >= 0x40) {
+                rgb_vial_get(data);
+            } else if (command_data[0] == 2) {
+                rgb_via_get(data);
+            }
+            break;
+
+        case 0x09:
+            rgb_save();
+            break;
+#endif
 
 #ifdef VIAL_ENABLE
         case 0xFE:
