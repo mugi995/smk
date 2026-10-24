@@ -69,6 +69,26 @@ void vial_process(__xdata uint8_t *data)
             data[0] = 1;
             break;
 
+        // QMK settings query: no settings. The GUI loops until the first
+        // 16-bit QSID is 0xFFFF, so an all-zero answer would spin forever.
+        case 0x09:
+            zero_report(data);
+            data[0] = 0xFF;
+            data[1] = 0xFF;
+            break;
+
+        // QMK settings get/set/reset: nothing to do without settings.
+        case 0x0A:
+        case 0x0B:
+        case 0x0C:
+            zero_report(data);
+            break;
+
+        // Dynamic entries (tap dance, combo, key override, alt repeat): none.
+        case 0x0D:
+            zero_report(data);
+            break;
+
         default:
             zero_report(data);
             break;
