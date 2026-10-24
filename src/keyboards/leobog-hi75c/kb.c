@@ -6,6 +6,7 @@
 #include "matrix.h"
 #include "pwm.h"
 #include "report.h"
+#include "rgb.h"
 #include "settings.h"
 #include "usb.h"
 #include "user_matrix.h"
@@ -98,6 +99,7 @@ void led_scan_isr(void)
     if (led_col >= 15) {
         led_col = 0;
     }
+    rgb_scan_isr(led_col);
     user_matrix_col_select(led_col);
 }
 
@@ -106,6 +108,7 @@ void kb_init(void)
     enc_prev = (uint8_t)((P0 >> 5) & 0x03);
     enc_acc  = 0;
     led_pwm_init();
+    rgb_init();
 }
 
 // dir 0 = CCW / VOL_DOWN, dir 1 = CW / VOL_UP.
