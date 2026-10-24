@@ -14,9 +14,12 @@
 #define RGB_COLS 15
 #define RGB_ROWS 6
 
-// [column (COM)][row][colour], 8-bit per channel. One column is 18 contiguous
-// bytes, which is exactly the SEG order the PWM channels expect.
-static __xdata uint8_t rgb_frame[RGB_COLS][RGB_ROWS][3];
+// Two frames: rgb_render() fills the inactive one and then swaps, so the PWM
+// scan interrupt never reads a half-written frame while the effect animates.
+// [buffer][column (COM)][row][colour], 8-bit per channel. One column is 18
+// contiguous bytes, which is exactly the SEG order the PWM channels expect.
+static __xdata uint8_t rgb_frame[2][RGB_COLS][RGB_ROWS][3];
+static uint8_t         rgb_active;
 
 // Effect state: rgb_phase is the animation step, rgb_tick counts scans since the
 // last frame. Both are 8-bit so the hue arithmetic wraps on its own.
@@ -88,7 +91,7 @@ static void hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v, __xdata uint8_t *out)
 
 // Fills the whole matrix from user_settings.rgb_mode, whose value is a VialRGB
 // effect id. Effects this engine does not implement fall back to SOLID.
-static static void rgb_render(void)
+static void rgb_render(void)
 {
     const uint8_t mode  = user_settings.rgb_mode;
     const uint8_t base  = user_settings.rgb_hue;
@@ -96,7 +99,8 @@ static static void rgb_render(void)
     const uint8_t val   = user_settings.rgb_val;
     const uint8_t phase = rgb_phase;
 
-    __xdata uint8_t *cell = &rgb_frame[0][0][0];
+    const uint8_t    next = (uint8_t)(rgb_active ^ 1);
+    __xdata uint8_t *cell = &rgb_frame[next][0][0][0];
 
     for (uint8_t col = 0; col < RGB_COLS; col++) {
         for (uint8_t row = 0; row < RGB_ROWS; row++) {
@@ -145,6 +149,8 @@ static static void rgb_render(void)
             cell += 3;
         }
     }
+
+    rgb_active = next;
 }
 
 void rgb_init(void)
@@ -153,8 +159,8 @@ void rgb_init(void)
     // record (a blank NVM or one from before the RGB fields existed), start
     // with a visible default; otherwise keep exactly what was stored.
     if (!settings_loaded) {
-        user_settings.rgb_mode  = 13; // CYCLE_ALL
-        user_settings.rgb_speed = 64;
+        user_settings.rgb_mode  = 2; // SOLID (diagnostic: no animation flicker)
+        user_settings.rgb_speed = 0;
         user_settings.rgb_hue   = 0;
         user_settings.rgb_sat   = 255;
         user_settings.rgb_val   = 128;
@@ -227,7 +233,7 @@ void rgb_task(void)
 // COM deselected, so the new duty values cannot be shown by the previous column.
 void rgb_scan_isr(uint8_t col)
 {
-    const __xdata uint8_t *f = &rgb_frame[col][0][0];
+    const __xdata uint8_t *f = &rgb_frame[rgb_active][col][0][0];
 
     // Left-shift by 2 keeps the stock scaling (duty = 4 * colour, 0..1020).
     SET_PWM_DUTY_2(PWM20, (uint16_t)f[0] << 2);
