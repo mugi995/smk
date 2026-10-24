@@ -69,6 +69,12 @@ void led_scan_isr(void)
     // Clear PWM0 period interrupt flag (PWM0IF, bit5).
     PWM00CON &= (uint8_t)~0x20;
 
+    // The column selected during the previous PWM period has had a full period
+    // to settle: sample its rows before advancing the COM. This keeps the key
+    // scan and the LED scan on the same column, so the display never shows a
+    // single scanned column of colour.
+    matrix_sample_column(led_col, user_matrix_read_rows());
+
     user_matrix_col_deselect(led_col);
     led_col++;
     if (led_col >= 15) {

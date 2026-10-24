@@ -129,6 +129,12 @@ static void process_key_state(uint8_t row, uint8_t col, bool pressed)
     send_keycode(qcode, pressed);
 }
 
+void matrix_sample_column(uint8_t col, uint8_t rows)
+{
+    matrix[col]    = (matrix_col_t)~rows;
+    matrix_updated = true;
+}
+
 void matrix_scan_full(void)
 {
     indicators_pwm_disable();
